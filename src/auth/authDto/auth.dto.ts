@@ -1,0 +1,24 @@
+import { IsEmail, IsNotEmpty } from 'class-validator';
+import { IsStrongPassword } from '@decorators/is-strong-password.decorator';
+import { Match } from '@/decorators/match.decorator';
+
+export class Credentials {
+  @IsNotEmpty({ message: 'Укажите настояший email' })
+  @IsEmail({}, { message: 'Укажите настояший email' })
+  email: string;
+
+  @IsNotEmpty({ message: 'Укажите пароль' })
+  @IsStrongPassword()
+  password: string;
+}
+
+export class CredentialsSignup extends Credentials {
+  @IsNotEmpty({ message: 'Повторите пароль' })
+  @Match('password')
+  password_repeat: string;
+}
+
+export class TokenUid {
+  @IsNotEmpty()
+  idToken: string;
+}
