@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { Auth, User, getAuth } from 'firebase/auth';
+import { Database, getDatabase } from 'firebase/database';
+import { Firestore, getFirestore } from 'firebase/firestore';
 
 @Injectable()
 export class FirebaseService {
   private readonly app: FirebaseApp;
   private readonly auth: Auth;
+  private readonly RtDB: Database;
+  private readonly Firestore: Firestore;
   private user: User;
 
   constructor(private config: ConfigService) {
@@ -26,6 +30,18 @@ export class FirebaseService {
     const auth = getAuth(this.app);
     auth.languageCode = 'en';
     this.auth = auth;
+    const RtDB = getDatabase(this.app);
+    this.RtDB = RtDB;
+    const firestore = getFirestore(this.app);
+    this.Firestore = firestore;
+  }
+
+  getRtDB() {
+    return this.RtDB;
+  }
+
+  getFirestore() {
+    return this.Firestore;
   }
 
   getApp() {

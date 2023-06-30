@@ -11,3 +11,13 @@ export class NewFileDto {
   @IsNotEmpty()
   user: User;
 }
+
+export class RawData {
+  articleWB: string | null;
+  brand: string | null;
+  rating: number | null;
+  response: string[] | null;
+  triggers: string[] | null;
+  blacklistResponse: string | null;
+  recommendation: string[] | null;
+}
