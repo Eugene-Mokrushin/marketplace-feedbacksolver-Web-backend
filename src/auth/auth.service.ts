@@ -28,11 +28,11 @@ export class AuthService {
         credentials.email,
         credentials.password,
       )
-        .then((userCredential) => {
+        .then(async (userCredential) => {
           const user = userCredential.user;
           this.firebaseService.setUser(user);
-          this.setupBasicUserProfile(user);
-          this.createNewOrganization(user);
+          const organizationId = await this.createNewOrganization(user);
+          this.setupBasicUserProfile(user, organizationId);
           this.logger.log(`Signed up ${user.uid}`);
           return user;
         })
@@ -118,27 +118,23 @@ export class AuthService {
         'organizations',
         newOrganizationId,
       );
-      const userRef = doc(
-        this.firebaseService.getFirestore(),
-        'users',
-        user.uid,
-      );
       await setDoc(
         organizationRef,
         {
-          users: [{ userRef, role: 'admin' }],
+          users: [{ userId: user.uid, role: 'admin' }],
           plan: 'Basic',
           organization_name: `Организация ${user.email.split('@')[0]}`,
         },
         { merge: true },
       );
+      return newOrganizationId;
     } catch (error) {
       this.logger.error(`Error creating new organization: ${error}`);
       throw new HttpException(error.response, error.status);
     }
   }
 
-  private async setupBasicUserProfile(user: User) {
+  private async setupBasicUserProfile(user: User, organizationId: string) {
     try {
       const usersRef = doc(
         this.firebaseService.getFirestore(),
@@ -149,6 +145,7 @@ export class AuthService {
         usersRef,
         {
           users_name: user.email.split('@')[0],
+          organizations: [organizationId],
           registred_at: Timestamp.fromDate(new Date()),
         },
         { merge: true },
