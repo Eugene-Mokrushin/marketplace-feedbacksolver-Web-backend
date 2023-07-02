@@ -3,11 +3,13 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { App, initializeApp } from 'firebase-admin/app';
 import { Auth, getAuth } from 'firebase-admin/auth';
+import { Firestore, getFirestore } from 'firebase-admin/firestore';
 
 @Injectable()
 export class FirebaseAdminService {
   private readonly adminApp: App;
   private readonly adminAuth: Auth;
+  private readonly adminFirestore: Firestore;
 
   constructor(private config: ConfigService) {
     const app = initializeApp({
@@ -19,8 +21,10 @@ export class FirebaseAdminService {
       ),
     });
     const auth = getAuth(app);
+    const adminFirestore = getFirestore(app);
     this.adminAuth = auth;
     this.adminApp = app;
+    this.adminFirestore = adminFirestore;
   }
 
   getAdminApp() {
@@ -29,5 +33,9 @@ export class FirebaseAdminService {
 
   getAdminAuth() {
     return this.adminAuth;
+  }
+
+  getAdminFirestore() {
+    return this.adminFirestore;
   }
 }

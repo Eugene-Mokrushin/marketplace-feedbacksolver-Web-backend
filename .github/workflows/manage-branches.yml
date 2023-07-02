@@ -1,0 +1,29 @@
+name: Delete Branch on Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  delete_branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR base branch
+        id: pr_info
+        uses: actions/github-script@v4
+        with:
+          script: |
+            const baseBranch = context.payload.pull_request.base.ref;
+            core.setOutput('base_branch', baseBranch);
+      
+      - name: Delete Branch
+        if: |
+          github.event.pull_request.merged == true &&
+          steps.pr_info.outputs.base_branch != 'develop' &&
+          steps.pr_info.outputs.base_branch != 'main'
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+          git fetch --prune
+          git push origin --delete ${{ steps.pr_info.outputs.base_branch }}

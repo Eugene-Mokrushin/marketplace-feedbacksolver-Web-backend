@@ -1,4 +1,3 @@
-import { User } from '@firebase/auth';
 import { IsNotEmpty } from 'class-validator';
 
 export class NewFileDto {
@@ -9,7 +8,7 @@ export class NewFileDto {
   organizationUid: string;
 
   @IsNotEmpty()
-  user: User;
+  userId: string;
 }
 
 export class RawData {
@@ -20,4 +19,10 @@ export class RawData {
   triggers: string[] | null;
   blacklistResponse: string | null;
   recommendation: string[] | null;
+}
+
+export interface TemplateType {
+  file_name: string;
+  timestamp: Date;
+  raw_data?: string;
 }
