@@ -4,7 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { plainToClass } from 'class-transformer';
 import { validate } from 'class-validator';
-import { LoggerService } from '../../logger/logger.service';
+import { LoggerService } from '../../log/logger.service';
 import { TokenUid } from '../authDto';
 
 @Injectable()

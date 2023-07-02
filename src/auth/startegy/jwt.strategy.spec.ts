@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtStrategy } from './jwt.strategy';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
-import { LoggerService } from '../../logger/logger.service';
+import { LoggerService } from '../../log/logger.service';
 const mockConfigService = {
   get: jest.fn().mockReturnValue('test-secret-key'),
 };
