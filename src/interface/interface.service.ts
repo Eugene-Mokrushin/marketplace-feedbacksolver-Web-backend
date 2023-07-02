@@ -1,15 +1,17 @@
 import { FirebaseService } from '@/firebase/firebase.service';
 import { LoggerService } from '@/log/logger.service';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { NewMarketplaceDto } from './interfaceDto';
+import { NewMarketplaceDto, AddUserDto } from './interfaceDto';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
 
 @Injectable()
 export class InterfaceService {
   constructor(
     private logger: LoggerService,
     private firebaseService: FirebaseService,
+    private firebaseAdminService: FirebaseAdminService,
   ) {}
 
   async addNewMarketplace(NewMarketplaceDto: NewMarketplaceDto) {
@@ -59,5 +61,20 @@ export class InterfaceService {
       );
       throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  // TODO: add user to organization
+  async addUserToOrganization(AddUserDto: AddUserDto) {
+    this.firebaseAdminService
+      .getAdminAuth()
+      .getUserByEmail(AddUserDto.userToAdd)
+      .then((userRecord) => {
+        // User found
+        console.log('Successfully fetched user data:', userRecord.toJSON());
+      })
+      .catch((error) => {
+        // Error fetching user
+        console.error('Error fetching user data:', error);
+      });
   }
 }

@@ -126,7 +126,7 @@ export class AuthService {
       await setDoc(
         organizationRef,
         {
-          users: [userRef],
+          users: [{ userRef, role: 'admin' }],
           plan: 'Basic',
           organization_name: `Организация ${user.email.split('@')[0]}`,
         },
