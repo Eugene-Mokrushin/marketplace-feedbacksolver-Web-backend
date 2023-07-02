@@ -4,6 +4,8 @@ import { LoggerService } from '@/log/logger.service';
 import { NewFileDto, RawData } from './templatesDto';
 import { FirebaseService } from '@/firebase/firebase.service';
 import {
+  DocumentData,
+  DocumentReference,
   Timestamp,
   collection,
   doc,
@@ -113,43 +115,63 @@ export class TemplatesService {
         /\.(xlsx|xls|csv|xlsb|xlsm|xls|xlt|xltm|xla|xlam)$/i,
         '',
       );
-      // Make file plain
-      const deciferedFile = await this.decipherFile(file);
-      // Uploads file to bucket
-      await this.uploadFile(NewFileDto, ufid, file, fileName);
-      // Saves raw file for future use
-      await this.saveRawFile(deciferedFile, ufid, fileName);
-      // // Adds file to organization as reference
-      await this.assignFile(NewFileDto.organizationUid, ufid);
-      return { fileId: ufid };
+
+      const organizationRef = doc(
+        this.firebaseService.getFirestore(),
+        'organizations',
+        NewFileDto.organizationUid,
+      );
+      const organizationDoc = await getDoc(organizationRef);
+      const usersRef = doc(
+        this.firebaseService.getFirestore(),
+        'users',
+        NewFileDto.userId,
+      );
+      const usersDoc = await getDoc(usersRef);
+      if (organizationDoc.exists() && usersDoc.exists()) {
+        if (
+          !usersDoc.data().organizations.includes(NewFileDto.organizationUid)
+        ) {
+          throw new HttpException(
+            'You dont have permissions',
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+        const organizationFiles = organizationDoc.data().files;
+        // Make file plain
+        const deciferedFile = await this.decipherFile(file);
+        // Uploads file to bucket
+        await this.uploadFile(NewFileDto, ufid, file, fileName);
+        // Saves raw file for future use
+        await this.saveRawFile(deciferedFile, ufid, fileName);
+        // Adds file to organization as reference
+        await this.assignFile(organizationRef, organizationFiles, ufid);
+        return { fileId: ufid };
+      } else {
+        throw new HttpException(
+          'No such organization or user was found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
     } catch (error) {
-      const errorCode = error.code;
+      const errorCode = error.status || HttpStatus.INTERNAL_SERVER_ERROR;
       const errorMessage = error.message;
       this.logger.error(
         `Failed to upload the file general ${errorCode}. Message: ${errorMessage}`,
       );
-      throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(errorMessage, errorCode);
     }
   }
 
-  private async assignFile(oraginizationId: string, ufid: string) {
+  private async assignFile(
+    organizationRef: DocumentReference<DocumentData>,
+    organizationFiles: string[] | undefined,
+    ufid: string,
+  ) {
     try {
-      const organizationRef = doc(
-        this.firebaseService.getFirestore(),
-        'organizations',
-        oraginizationId,
-      );
-      const organizationDoc = await getDoc(organizationRef);
-      if (organizationDoc.exists()) {
-        const filesArray = organizationDoc.data().files || [];
-        filesArray.push(ufid);
-        await setDoc(organizationRef, { files: filesArray }, { merge: true });
-      } else {
-        throw new HttpException(
-          'No such organization was found',
-          HttpStatus.NOT_FOUND,
-        );
-      }
+      const filesArray = organizationFiles || [];
+      filesArray.push(ufid);
+      await setDoc(organizationRef, { files: filesArray }, { merge: true });
     } catch (error) {
       const errorCode = error.code;
       const errorMessage = error.message;

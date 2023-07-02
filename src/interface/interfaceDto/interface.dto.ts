@@ -16,9 +16,12 @@ export class NewMarketplaceDto {
 }
 
 export class AddUserDto {
-  @IsNotEmpty()
+  @IsNotEmpty({ message: '???' })
   @IsEmail()
   userToAdd: string;
+
+  @IsNotEmpty()
+  userSetter: string;
 
   @IsNotEmpty()
   organizationId: string;
