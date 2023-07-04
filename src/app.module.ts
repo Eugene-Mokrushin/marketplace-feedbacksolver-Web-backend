@@ -6,6 +6,7 @@ import { LoggerModule } from './log/logger.module';
 import { FirebaseModule } from './firebase/firebase.module';
 import { TemplatesModule } from './templates/templates.module';
 import { InterfaceModule } from './interface/interface.module';
+import { SocketModule } from './socket/socket.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { InterfaceModule } from './interface/interface.module';
     AuthModule,
     TemplatesModule,
     InterfaceModule,
+    SocketModule,
   ],
 })
 export class AppModule {}
