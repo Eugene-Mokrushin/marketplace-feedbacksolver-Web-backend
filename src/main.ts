@@ -10,6 +10,12 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+  app.enableCors({
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  });
+
   const PORT = 2001;
   app.use(cookieParser());
   await app.listen(PORT);

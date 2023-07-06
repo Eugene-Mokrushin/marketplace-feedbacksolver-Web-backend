@@ -5,9 +5,8 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { OnModuleInit } from '@nestjs/common';
 
-@WebSocketGateway()
+@WebSocketGateway(2007, { cors: { origin: '*' } })
 export class WebsocketGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
@@ -24,32 +23,23 @@ export class WebsocketGateway
   // }
 
   handleConnection(client: Socket) {
-    console.log('Client connected:', client.id);
+    console.log('Client connected 1:', client.id);
     this.clients.push(client);
+    client.emit('id', client.id);
   }
 
   handleDisconnect(client: Socket) {
     console.log('Client disconnected:', client.id);
     this.clients = this.clients.filter((c) => c !== client);
+    console.log(this.clients);
   }
 
-  async initiateWebSocketConnection(): Promise<Socket> {
-    console.log(this.clients);
-    if (this.clients.length > 0) {
-      const client = this.clients[0];
-      // Close any existing connection
-      client.disconnect();
+  getClientSocket(clientId: string) {
+    return this.clients.find((client) => client.id === clientId);
+  }
 
-      return new Promise<Socket>((resolve) => {
-        client.on('connect', () => {
-          // Initiate the WS connection
-          client.emit('connectionInitiated', 'WS connection initiated.');
-
-          resolve(client);
-        });
-      });
-    } else {
-      throw new Error('No clients connected.');
-    }
+  updateProgress(client: Socket, progress: number) {
+    // Emit the progress event to the specific client
+    client.emit('progress', progress);
   }
 }
