@@ -20,9 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: any, req: any) {
     if (payload.exp <= Math.floor(Date.now() / 1000)) {
       this.logger.warn(`Token of user ${payload.uid} had expired`);
-      throw new UnauthorizedException(
-        'У вас нет прав или ваша кнопка более не активна. Для создания заявки обратитесь к MAY Assistant еще раз для получения новой кнопки.',
-      );
+      throw new UnauthorizedException('Token expired');
     }
     if (!payload.uid) {
       throw new UnauthorizedException('Missing email in token payload');
@@ -33,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid email in token payload');
     }
 
-    req.user = { uid: payload.uid };
-    return { uid: payload.uid };
+    req.tokenData = payload;
+    return { tokenData: payload };
   }
 }

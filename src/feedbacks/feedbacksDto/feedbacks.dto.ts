@@ -1,4 +1,4 @@
-import { IsNotEmpty } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsInt, IsString } from 'class-validator';
 
 export class GetFeedbacksDto {
   @IsNotEmpty()
@@ -9,15 +9,31 @@ export class GetFeedbacksDto {
 
   @IsNotEmpty()
   marketplaceId: string;
+
+  @IsBoolean()
+  isAnswered: boolean;
+
+  @IsInt()
+  @IsNotEmpty()
+  skip: number;
+
+  isAsc?: boolean;
+  secretKey?: string;
+  templateId?: string;
+  aiModel?: string;
+  isPersonalized?: boolean;
 }
 
 export class ReplyDto {
-  markeplaceId: string;
-}
-
-export interface UserInterface {
+  @IsNotEmpty()
   userId: string;
-  role: string;
+
+  @IsNotEmpty()
+  @IsString()
+  replyText: string;
+
+  @IsNotEmpty()
+  feedbackId: string;
 }
 
 export interface KeyInterface {
@@ -32,11 +48,13 @@ export interface FilteredFiveFeedback {
   user: string;
   feedback: string;
   response: string;
+  firstPhotoLink: string | null;
+  createdDate: string;
 }
 
 export class WBmanyDto {
   @IsNotEmpty()
-  clientId: string;
+  userId: string;
 
   @IsNotEmpty()
   organizationId: string;
@@ -46,6 +64,9 @@ export class WBmanyDto {
 
   @IsNotEmpty()
   selectedTemplateId: string;
+
+  @IsBoolean()
+  personalizedResponse: boolean;
 
   secretKey?: string;
 }
@@ -83,8 +104,9 @@ export interface FeedbackInterface {
 
 export interface Template {
   brand: string;
-  message: string;
-  article: string;
-  triggerWords: string[] | null;
-  suggestions: string[] | null;
+  response: string;
+  articleWB: string;
+  triggers: string[] | null;
+  recommendation: string[] | null;
+  blacklistResponse: string[] | null;
 }
