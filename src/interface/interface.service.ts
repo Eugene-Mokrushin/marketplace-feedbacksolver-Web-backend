@@ -5,6 +5,7 @@ import { NewMarketplaceDto, AddUserDto } from './interfaceDto';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
+import { SharedService } from '@/shared/shared.service';
 
 @Injectable()
 export class InterfaceService {
@@ -12,6 +13,7 @@ export class InterfaceService {
     private logger: LoggerService,
     private firebaseService: FirebaseService,
     private firebaseAdminService: FirebaseAdminService,
+    private sharedService: SharedService,
   ) {}
 
   async addNewMarketplace(NewMarketplaceDto: NewMarketplaceDto) {
@@ -27,8 +29,12 @@ export class InterfaceService {
         // Adding keys
         const secret_keysArray = organizationDoc.data().secret_keys || [];
         const new_secret_key = {
-          change_key: NewMarketplaceDto.change_key || null,
-          stats_key: NewMarketplaceDto.stats_key || null,
+          change_key:
+            this.sharedService.encodeSecretKey(NewMarketplaceDto.change_key) ||
+            null,
+          stats_key:
+            this.sharedService.encodeSecretKey(NewMarketplaceDto.stats_key) ||
+            null,
           uid: newKeyPairId,
         };
         secret_keysArray.push(new_secret_key);

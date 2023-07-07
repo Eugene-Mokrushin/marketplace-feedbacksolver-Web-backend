@@ -38,7 +38,7 @@ export class WebsocketGateway
     return this.clients.find((client) => client.id === clientId);
   }
 
-  updateProgress(client: Socket, progress: number) {
+  updateProgress(client: Socket, progress: object) {
     // Emit the progress event to the specific client
     client.emit('progress', progress);
   }

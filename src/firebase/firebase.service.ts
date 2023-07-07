@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { Auth, User, getAuth } from 'firebase/auth';
 import { Database, getDatabase } from 'firebase/database';
-import { Firestore, getFirestore } from 'firebase/firestore';
+import { Firestore, getFirestore, doc, getDoc } from 'firebase/firestore';
+import { UserInterface } from './firebaseDto';
 
 @Injectable()
 export class FirebaseService {
@@ -54,5 +55,41 @@ export class FirebaseService {
 
   setUser(user: User) {
     this.user = user;
+  }
+
+  async checkAccessRights(
+    organizationId: string,
+    userToCheck: string,
+    role: string,
+  ) {
+    const organizationRef = doc(
+      this.getFirestore(),
+      'organizations',
+      organizationId,
+    );
+    const organizationDoc = await getDoc(organizationRef);
+    if (!organizationDoc.exists()) {
+      throw new HttpException(
+        'No such organization was found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const users = organizationDoc.data().users as UserInterface[];
+    const user = users.find(
+      (user: UserInterface) => user.userId === userToCheck,
+    );
+    if (!user) {
+      throw new HttpException(
+        'No such user was found in this organization',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if (user.role !== role) {
+      throw new HttpException(
+        'User does not have the required role',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    return user;
   }
 }
