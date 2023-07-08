@@ -124,7 +124,7 @@ export class FeedbacksService {
         }
       });
       const token = this.sharedService.signToken({
-        secretKey: GetFeedbacksDto.secretKey,
+        secretKey: this.sharedService.encodeSecretKey(secretKey),
       });
       return { data: feedbacksWithSuggestedResponses, token };
     } catch (error) {

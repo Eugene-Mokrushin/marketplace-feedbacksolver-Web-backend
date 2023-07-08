@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Credentials, CredentialsSignup, TokenUid } from './authDto';
 import { LoggerService } from '@/log/logger.service';
 import { FirebaseService } from '@/firebase/firebase.service';
@@ -72,10 +77,7 @@ export class AuthService {
           this.logger.error(
             `Failed to sign in ${errorCode}. Message: ${errorMessage}`,
           );
-          throw new HttpException(
-            errorMessage.replace('Firebase: ', ''),
-            HttpStatus.UNAUTHORIZED,
-          );
+          throw new UnauthorizedException(errorMessage);
         });
       return { data: response };
     } catch (error) {

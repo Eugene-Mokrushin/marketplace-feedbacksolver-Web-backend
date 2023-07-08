@@ -1,7 +1,7 @@
 import { FirebaseService } from '@/firebase/firebase.service';
 import { LoggerService } from '@/log/logger.service';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { NewMarketplaceDto, AddUserDto } from './interfaceDto';
+import { NewMarketplaceDto, AddUserDto, NewKeyPairDto } from './interfaceDto';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
@@ -66,6 +66,74 @@ export class InterfaceService {
         `Failed to assign new keypair ${errorCode}. Message: ${errorMessage}`,
       );
       throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async setNewKeyPair(NewKeyPairDto: NewKeyPairDto) {
+    try {
+      const organizationRef = doc(
+        this.firebaseService.getFirestore(),
+        'organizations',
+        NewKeyPairDto.organizationId,
+      );
+      const organizationDoc = await getDoc(organizationRef);
+      if (organizationDoc.exists()) {
+        const userInOrganization = organizationDoc
+          .data()
+          .users.find((user: { userId: string }) => {
+            if (user.userId === NewKeyPairDto.userId) {
+              return user;
+            } else {
+              return null;
+            }
+          });
+        if (!userInOrganization || userInOrganization.role !== 'admin') {
+          throw new HttpException(
+            "You don't have permissions",
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+        const secret_keysArray = organizationDoc.data().secret_keys || [];
+        const uidToUpdate = secret_keysArray.pop((key: { uid: string }) => {
+          if (key.uid === NewKeyPairDto.marketplaceId) {
+            return key;
+          } else {
+            return null;
+          }
+        });
+        if (!uidToUpdate) {
+          throw new HttpException(
+            'No such marketplace was found',
+            HttpStatus.NOT_FOUND,
+          );
+        }
+
+        const new_secret_key = {
+          change_key:
+            this.sharedService.encodeSecretKey(NewKeyPairDto.change_key) ||
+            uidToUpdate.change_key,
+          stats_key:
+            this.sharedService.encodeSecretKey(NewKeyPairDto.stats_key) ||
+            uidToUpdate.stats_key,
+          uid: NewKeyPairDto.marketplaceId,
+        };
+        console.log(new_secret_key);
+        secret_keysArray.push(new_secret_key);
+
+        await setDoc(
+          organizationRef,
+          { secret_keys: secret_keysArray },
+          { merge: true },
+        );
+      }
+    } catch (error) {
+      const errorCode =
+        error.code || error.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      const errorMessage = error.message;
+      this.logger.error(
+        `Failed to assign new keypair ${errorCode}. Message: ${errorMessage}`,
+      );
+      throw new HttpException(errorMessage, errorCode);
     }
   }
 

@@ -16,7 +16,6 @@ export class NewMarketplaceDto {
 }
 
 export class AddUserDto {
-  @IsNotEmpty({ message: '???' })
   @IsEmail()
   userToAdd: string;
 
@@ -28,4 +27,19 @@ export class AddUserDto {
 
   @IsNotEmpty()
   role: string;
+}
+
+export class NewKeyPairDto {
+  @IsNotEmpty()
+  userId: string;
+
+  @IsNotEmpty()
+  organizationId: string;
+
+  change_key: string | null;
+
+  stats_key: string | null;
+
+  @IsNotEmpty()
+  marketplaceId: string;
 }

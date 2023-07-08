@@ -20,15 +20,12 @@ export class SharedService {
     }
     const algorithm = 'AES-256-GCM';
     const key = this.config.get('SUPER_SECRET_ENCRYPTION_KEY');
-    const stringRepresentation = this.config.get('SUPER_SECRET_ENCRYPTION_IV');
+    const stringRepresentation = this.config.get('SUPER_SECRET_IV_KEY');
     const buffer = Buffer.from(
-      stringRepresentation
-        .replace(/^(<Buffer\s+|\s+>)$/g, '')
-        .replace(/\s/g, ''),
+      stringRepresentation.replace(/^<Buffer\s+|\s+>$/g, '').replace(/\s/g, ''),
       'hex',
     );
     const iv = buffer;
-    console.log(iv);
     const cipher = crypto.createCipheriv(algorithm, key, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -41,11 +38,9 @@ export class SharedService {
     }
     const algorithm = 'AES-256-GCM';
     const key = this.config.get('SUPER_SECRET_ENCRYPTION_KEY');
-    const stringRepresentation = this.config.get('SUPER_SECRET_ENCRYPTION_IV');
+    const stringRepresentation = this.config.get('SUPER_SECRET_IV_KEY');
     const buffer = Buffer.from(
-      stringRepresentation
-        .replace(/^(<Buffer\s+|\s+>)$/g, '')
-        .replace(/\s/g, ''),
+      stringRepresentation.replace(/^<Buffer\s+|\s+>$/g, '').replace(/\s/g, ''),
       'hex',
     );
     const iv = buffer;
