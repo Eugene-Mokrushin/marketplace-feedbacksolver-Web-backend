@@ -20,8 +20,9 @@ export class GetFeedbacksDto {
   isAsc?: boolean;
   secretKey?: string;
   templateId?: string;
-  aiModel?: string;
+  aiModel?: 'gpt-3.5' | 'gpt-4';
   isPersonalized?: boolean;
+  numberOfSuggestions?: number;
 }
 
 export class ReplyDto {

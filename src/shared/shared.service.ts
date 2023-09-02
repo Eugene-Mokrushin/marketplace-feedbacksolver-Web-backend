@@ -57,6 +57,7 @@ export class SharedService {
         }),
         catchError((error) => {
           const errorMessage = `Server connection Error`;
+          console.log(error);
           const status = error.response?.status || HttpStatus.UNAUTHORIZED;
           this.logger.error(`Couldn't fetch `);
           throw new HttpException(errorMessage, status);

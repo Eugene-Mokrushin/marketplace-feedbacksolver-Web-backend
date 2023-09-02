@@ -15,6 +15,7 @@ import { HttpService } from '@nestjs/axios';
 import allRussianNames from '@/dump/realRussianNames';
 import { WebsocketGateway } from '@/websocket/websocket.gateway';
 import { SharedService } from '@/shared/shared.service';
+import { OpenAIService } from '@/openai/openai.service';
 
 @Injectable()
 export class FeedbacksService {
@@ -24,18 +25,21 @@ export class FeedbacksService {
     private firebaseService: FirebaseService,
     private httpService: HttpService,
     private sharedService: SharedService,
+    private openaiService: OpenAIService,
   ) {}
 
   async getWildberriesFeedbacks(GetFeedbacksDto: GetFeedbacksDto) {
     try {
-      let secretKey = this.sharedService.decodeSecretKey(
-        GetFeedbacksDto.secretKey,
-      );
-      await this.firebaseService.checkAccessRights(
-        GetFeedbacksDto.organizationId,
-        GetFeedbacksDto.userId,
-        'admin',
-      );
+      // let secretKey = this.sharedService.decodeSecretKey(
+      //   GetFeedbacksDto.secretKey,
+      // );
+      let secretKey =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NJRCI6IjczNjk4MDg0LWY3ZGMtNDkwMS1iZGZlLWUzNDcxMGY5OTJkNyJ9.VyUKO6zkbgBgDx6rECcX_j6R5s0SRlWKMp-61nEsEB8';
+      // await this.firebaseService.checkAccessRights(
+      //   GetFeedbacksDto.organizationId,
+      //   GetFeedbacksDto.userId,
+      //   'admin',
+      // );
       if (!secretKey) {
         const organizationRef = doc(
           this.firebaseService.getFirestore(),
@@ -65,7 +69,7 @@ export class FeedbacksService {
       }
       const params = {
         isAnswered: GetFeedbacksDto.isAnswered,
-        take: 20,
+        take: 5,
         skip: GetFeedbacksDto.skip,
         order: GetFeedbacksDto.isAsc ? 'dateAsc' : 'dateDesc',
       };
@@ -77,56 +81,91 @@ export class FeedbacksService {
         }),
       );
 
-      const template = GetFeedbacksDto.templateId
-        ? await this.getTemplateFile(GetFeedbacksDto.templateId)
-        : null;
+      // const template = GetFeedbacksDto.templateId
+      //   ? await this.getTemplateFile(GetFeedbacksDto.templateId)
+      //   : null;
 
-      const feedbacksWithSuggestedResponses = (
-        feedbacksData.data.feedbacks as FeedbackInterface[]
-      ).map((feedback) => {
-        if (template) {
-          const {
-            imtId,
-            productDetails,
-            userName,
-            text,
-            id,
-            createdDate,
-            photoLinks,
-          } = feedback;
-          const brand = productDetails.brandName;
-          const productName = productDetails.productName;
-          const { suggestedResponses } = this.findResponsesInTemplateFile(
-            imtId.toString(),
-            brand,
-            text,
-            template,
-            GetFeedbacksDto.isPersonalized,
-            userName,
-          );
-          return {
-            feedbackId: id,
-            feedbackText: text,
-            feedbackDate: createdDate,
-            productDetails: {
-              brand,
-              productName,
-              photoLink: photoLinks[0].miniSize,
-            },
-            suggestedResponses,
-          };
-        } else if (GetFeedbacksDto.aiModel) {
-          console.log('AI model');
-          // TODO: AI model
-          return null;
-        } else {
-          return null;
-        }
+      const template = false;
+      const feedbacks = feedbacksData.data.feedbacks as FeedbackInterface[];
+
+      const feedbacksWithoutSuggestions = feedbacks.map((feedback) => {
+        const {
+          imtId,
+          productDetails,
+          userName,
+          text,
+          id,
+          createdDate,
+          photoLinks,
+          productValuation,
+        } = feedback;
+        const brand = productDetails.brandName;
+        const productName = productDetails.productName;
+        return {
+          itemId: imtId,
+          feedbackId: id,
+          feedback: text,
+          img: 'GET PRODUCT IMAGE FROM WB API',
+          score: productValuation,
+          name: userName,
+          feedbackDate: createdDate,
+          productName,
+          brand,
+          userPhotos: photoLinks,
+          suggestions: null,
+        };
       });
-      const token = this.sharedService.signToken({
-        secretKey: this.sharedService.encodeSecretKey(secretKey),
-      });
-      return { data: feedbacksWithSuggestedResponses, token };
+      if (template) {
+        const { suggestedResponses } = this.findResponsesInTemplateFile(
+          imtId.toString(),
+          brand,
+          text,
+          template,
+          GetFeedbacksDto.isPersonalized,
+          userName,
+        );
+      }
+      if (GetFeedbacksDto.aiModel && GetFeedbacksDto.aiModel === 'gpt-3.5') {
+        const suggestionsPromises = feedbacksWithoutSuggestions.map(
+          (feedback) => {
+            const promptUser = `На товар ${feedback.productName}, бренда ${
+              feedback.brand
+            } поступил отзыв "${feedback.feedback}", с оценкой ${
+              feedback.score
+            } из 5. От первого лица, напиши ${
+              GetFeedbacksDto.numberOfSuggestions
+                ? GetFeedbacksDto.numberOfSuggestions
+                : '1'
+            } разных варианта ответа на отзыв.`;
+            const promptSystem = `Ты представитель компании "UNIQUE Style", которая продает товары на маркетплейсе под названием "Wildberries". Твоя задача ответить на отзыв. Раздели варианты ответов 3-мя символами &&&, не нумеруй их. Например: &&&Ваше сообщение принято.&&&Спасибо за отзыв.&&&Мы ценим ваше мнение.`;
+            return this.openaiService.getResponseV3p5(promptUser, promptSystem);
+          },
+        );
+        const suggestionsUnfiltered = await Promise.all(suggestionsPromises);
+        const suggestionsFiltered = suggestionsUnfiltered.map((item) => {
+          return item
+            .split('&&&')
+            .filter(
+              (item) => item.trim() !== '' && item !== ' ' && item !== '\n',
+            )
+            .map((singleSuggestion) => {
+              return {
+                id: 'asd',
+                value: singleSuggestion,
+              };
+            });
+        });
+        feedbacksWithoutSuggestions.forEach((feedback, index) => {
+          feedback.suggestions = suggestionsFiltered[index];
+        });
+      }
+
+      console.log(result);
+      // const token = this.sharedService.signToken({
+      //   secretKey: this.sharedService.encodeSecretKey(secretKey),
+      // });
+      const token = 'token';
+      return { data: result, token };
     } catch (error) {
       this.logger.error(error);
       throw new HttpException('Error', HttpStatus.INTERNAL_SERVER_ERROR);
