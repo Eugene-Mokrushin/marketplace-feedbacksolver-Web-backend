@@ -17,6 +17,11 @@ export class GetFeedbacksDto {
   @IsNotEmpty()
   skip: number;
 
+  @IsInt()
+  @IsNotEmpty()
+  take: number;
+
+  @IsBoolean()
   isAsc?: boolean;
   secretKey?: string;
   templateId?: string;

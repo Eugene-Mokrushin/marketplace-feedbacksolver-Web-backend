@@ -69,7 +69,7 @@ export class FeedbacksService {
       }
       const params = {
         isAnswered: GetFeedbacksDto.isAnswered,
-        take: 5,
+        take: GetFeedbacksDto.take,
         skip: GetFeedbacksDto.skip,
         order: GetFeedbacksDto.isAsc ? 'dateAsc' : 'dateDesc',
       };
@@ -90,7 +90,6 @@ export class FeedbacksService {
 
       const feedbacksWithoutSuggestions = feedbacks.map((feedback) => {
         const {
-          imtId,
           productDetails,
           userName,
           text,
@@ -101,71 +100,86 @@ export class FeedbacksService {
         } = feedback;
         const brand = productDetails.brandName;
         const productName = productDetails.productName;
+        const imtId = productDetails.imtId;
+        const nmId = productDetails.nmId;
+        const productLink = `https://www.wildberries.ru/catalog/${nmId}/detail.aspx`;
         return {
-          itemId: imtId,
+          itemId: imtId.toString(),
+          nmId: nmId.toString(),
           feedbackId: id,
           feedback: text,
-          img: 'GET PRODUCT IMAGE FROM WB API',
+          media: null,
           score: productValuation,
           name: userName,
           feedbackDate: createdDate,
           productName,
+          productLink,
           brand,
           userPhotos: photoLinks,
           suggestions: null,
         };
       });
+      const productImages = await this.getProductImages(feedbacks, secretKey);
+      feedbacksWithoutSuggestions.forEach((feedback, index) => {
+        feedback.media = productImages[index];
+      });
       if (template) {
-        const { suggestedResponses } = this.findResponsesInTemplateFile(
-          imtId.toString(),
-          brand,
-          text,
-          template,
-          GetFeedbacksDto.isPersonalized,
-          userName,
-        );
+        feedbacksWithoutSuggestions.forEach((feedback) => {
+          const { suggestedResponses } = this.findResponsesInTemplateFile(
+            feedback.itemId,
+            feedback.brand,
+            feedback.feedback,
+            template,
+            GetFeedbacksDto.isPersonalized,
+            feedback.name,
+          );
+          feedback.suggestions = suggestedResponses;
+        });
       }
       if (GetFeedbacksDto.aiModel && GetFeedbacksDto.aiModel === 'gpt-3.5') {
         const suggestionsPromises = feedbacksWithoutSuggestions.map(
           (feedback) => {
-            const promptUser = `На товар ${feedback.productName}, бренда ${
+            const isValidUserName =
+              GetFeedbacksDto.isPersonalized && this.isNameValid(feedback.name);
+            const promptUser = `На товар ${feedback.productName}, бренда ${feedback.brand} поступил отзыв, с оценкой ${feedback.score} из 5. Отзыв: ${feedback.feedback}.`;
+            const promptSystem = `Ты представитель бренда ${
               feedback.brand
-            } поступил отзыв "${feedback.feedback}", с оценкой ${
-              feedback.score
-            } из 5. От первого лица, напиши ${
-              GetFeedbacksDto.numberOfSuggestions
-                ? GetFeedbacksDto.numberOfSuggestions
-                : '1'
-            } разных варианта ответа на отзыв.`;
-            const promptSystem = `Ты представитель компании "UNIQUE Style", которая продает товары на маркетплейсе под названием "Wildberries". Твоя задача ответить на отзыв. Раздели варианты ответов 3-мя символами &&&, не нумеруй их. Например: &&&Ваше сообщение принято.&&&Спасибо за отзыв.&&&Мы ценим ваше мнение.`;
-            return this.openaiService.getResponseV3p5(promptUser, promptSystem);
+            }, которая продает товары на маркетплейсе под названием "Wildberries". Твоя задача ответить на отзыв. Будь менее официален но обращайся на Вы, уложись масимум в 50 слов${
+              isValidUserName
+                ? ', обратись к пользователю по имени ' + feedback.name
+                : ''
+            }.`;
+            return Promise.all(
+              Array.from({
+                length: GetFeedbacksDto.numberOfSuggestions
+                  ? GetFeedbacksDto.numberOfSuggestions
+                  : 1,
+              }).map(() => {
+                return this.openaiService.getResponseV3p5(
+                  promptUser,
+                  promptSystem,
+                );
+              }),
+            );
           },
         );
-        const suggestionsUnfiltered = await Promise.all(suggestionsPromises);
-        const suggestionsFiltered = suggestionsUnfiltered.map((item) => {
-          return item
-            .split('&&&')
-            .filter(
-              (item) => item.trim() !== '' && item !== ' ' && item !== '\n',
-            )
-            .map((singleSuggestion) => {
-              return {
-                id: 'asd',
-                value: singleSuggestion,
-              };
-            });
-        });
+        const suggestions = await Promise.all(suggestionsPromises);
         feedbacksWithoutSuggestions.forEach((feedback, index) => {
-          feedback.suggestions = suggestionsFiltered[index];
+          const idedSuggestions = suggestions[index].map((item, index) => {
+            return {
+              id: feedback.feedbackId + '_' + index,
+              text: item,
+            };
+          });
+
+          feedback.suggestions = idedSuggestions;
         });
       }
-
-      console.log(result);
-      // const token = this.sharedService.signToken({
-      //   secretKey: this.sharedService.encodeSecretKey(secretKey),
-      // });
-      const token = 'token';
-      return { data: result, token };
+      const token = this.sharedService.signToken({
+        secretKey: this.sharedService.encodeSecretKey(secretKey),
+      });
+      // const token = 'token';
+      return { data: feedbacksWithoutSuggestions, token };
     } catch (error) {
       this.logger.error(error);
       throw new HttpException('Error', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -307,7 +321,7 @@ export class FeedbacksService {
           );
 
           const ifPersonalized = WBmanyDto.personalizedResponse
-            ? this.personalizeResponse(response, userName)
+            ? this.personalizeResponseTemplate(response, userName)
             : response;
 
           return {
@@ -361,17 +375,63 @@ export class FeedbacksService {
     }
   }
 
+  async getUptoDateQandFNumbers() {
+    const secretKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NJRCI6IjczNjk4MDg0LWY3ZGMtNDkwMS1iZGZlLWUzNDcxMGY5OTJkNyJ9.VyUKO6zkbgBgDx6rECcX_j6R5s0SRlWKMp-61nEsEB8';
+    // TODO: get secretKey
+    const subdomainFeedbacks = '/api/v1/feedbacks';
+    const subdomainQuestions = '/api/v1/questions';
+    const params = {
+      isAnswered: true,
+      take: 1,
+      skip: 0,
+      order: 'dateAsc',
+    };
+    const feedbackUrl = this.sharedService.buildUrl(subdomainFeedbacks, params);
+    const questionsUrl = this.sharedService.buildUrl(
+      subdomainQuestions,
+      params,
+    );
+
+    const [feedbacksData, questionsData] = await Promise.all([
+      this.sharedService
+        .makeHttpRequest(
+          this.httpService.get(feedbackUrl.toString(), {
+            headers: { Authorization: secretKey },
+          }),
+        )
+        .then((res) => ({
+          feedbacksUnanswered: res.data.countUnanswered,
+          feedbacksAnswered: res.data.countArchive,
+        })),
+      this.sharedService
+        .makeHttpRequest(
+          this.httpService.get(questionsUrl.toString(), {
+            headers: { Authorization: secretKey },
+          }),
+        )
+        .then((res) => ({
+          questionsUnanswered: res.data.countUnanswered,
+          questionsAnswered: res.data.countArchive,
+        })),
+    ]);
+
+    // Return both results
+    return { feedbacksData, questionsData };
+  }
+
   private getChangeKeys(keys: KeyInterface[], marketplaceToLook: string) {
     const secretKey = keys.find((key) => key.uid === marketplaceToLook);
     return secretKey.change_key || null;
   }
 
-  private personalizeResponse(text: string, userName: string): string {
-    const capitalizedUserName = userName.toLowerCase().charAt(0).toUpperCase();
+  private isNameValid(userName: string): boolean {
+    const capitalizedUserName =
+      userName.toLowerCase().charAt(0).toUpperCase() +
+      userName.toLowerCase().slice(1);
     let low = 0;
     let high = allRussianNames.length - 1;
     let foundName = null;
-
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
       const name = allRussianNames[mid];
@@ -386,9 +446,18 @@ export class FeedbacksService {
       }
     }
     if (!foundName) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  private personalizeResponseTemplate(text: string, userName: string): string {
+    const isValidUserName = this.isNameValid(userName);
+    if (!isValidUserName) {
       return text;
     } else {
-      return foundName + ', ' + text.charAt(0).toLowerCase() + text.slice(1);
+      return userName + ', ' + text.charAt(0).toLowerCase() + text.slice(1);
     }
   }
 
@@ -457,7 +526,7 @@ export class FeedbacksService {
         template.recommendation,
       );
       return isPersonalized
-        ? this.personalizeResponse(response, userName)
+        ? this.personalizeResponseTemplate(response, userName)
         : response;
     };
 
@@ -482,5 +551,47 @@ export class FeedbacksService {
         secondary: secondaryResponses,
       },
     };
+  }
+
+  private async getProductImages(
+    feedbacks: FeedbackInterface[],
+    secretKey: string,
+  ) {
+    try {
+      const productImagesPromises = feedbacks.map((feedback) => {
+        const { imtId } = feedback.productDetails;
+
+        const body = {
+          sort: {
+            cursor: {
+              limit: 1,
+            },
+            filter: {
+              withPhoto: -1,
+              imtID: imtId,
+            },
+          },
+        };
+        const res = this.sharedService.makeHttpRequest(
+          this.httpService.post(
+            'https://suppliers-api.wildberries.ru/content/v1/cards/cursor/list',
+            JSON.stringify(body),
+            {
+              headers: { Authorization: secretKey },
+            },
+          ),
+        );
+        return res;
+      });
+      const productImages = await Promise.all(productImagesPromises);
+      return productImages.map((item) => {
+        return item.data.cards.length > 0
+          ? item.data.cards[0].mediaFiles
+          : null;
+      });
+    } catch (error) {
+      this.logger.error(error);
+      throw new HttpException('Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

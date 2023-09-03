@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { GetFeedbacksDto, ReplyDto, WBmanyDto } from './feedbacksDto';
 import { FeedbacksService } from './feedbacks.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -22,5 +22,10 @@ export class FeedbacksController {
   @Post('post/allWildberries/:clientId')
   async initiateWebSocketConnection(@Body() dto: WBmanyDto) {
     return this.feedbackService.replyWildberriesFeedbackMultiple(dto);
+  }
+
+  @Get('QandF/wildberries')
+  getAllWildberriesFAQ() {
+    return this.feedbackService.getUptoDateQandFNumbers();
   }
 }
