@@ -5,14 +5,16 @@ export class NewMarketplaceDto {
   organizationId: string;
 
   @IsNotEmpty()
-  shop_name: string;
+  name: string;
 
-  change_key: string | null;
+  mainKey: string | null;
 
-  stats_key: string | null;
+  analyticsKey: string | null;
+
+  default: boolean | null;
 
   @IsNotEmpty()
-  marketplace: 'Wilberries' | 'Ozon' | 'Yandex';
+  type: 'wilberries' | 'ozon' | 'yandex';
 }
 
 export class AddUserDto {
@@ -31,15 +33,19 @@ export class AddUserDto {
 
 export class NewKeyPairDto {
   @IsNotEmpty()
-  userId: string;
-
-  @IsNotEmpty()
   organizationId: string;
 
-  change_key: string | null;
+  mainKey: string | null;
 
-  stats_key: string | null;
+  analyticsKey: string | null;
+
+  default: boolean | null;
 
   @IsNotEmpty()
-  marketplaceId: string;
+  id: string;
+}
+
+export class OrganizationIdDto {
+  @IsNotEmpty()
+  organizationId: string;
 }

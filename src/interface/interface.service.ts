@@ -3,7 +3,6 @@ import { LoggerService } from '@/log/logger.service';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { NewMarketplaceDto, AddUserDto, NewKeyPairDto } from './interfaceDto';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
 import { SharedService } from '@/shared/shared.service';
 
@@ -18,47 +17,39 @@ export class InterfaceService {
 
   async addNewMarketplace(NewMarketplaceDto: NewMarketplaceDto) {
     try {
-      const organizationRef = doc(
-        this.firebaseService.getFirestore(),
-        'organizations',
-        NewMarketplaceDto.organizationId,
-      );
-      const newKeyPairId = uuidv4();
-      const organizationDoc = await getDoc(organizationRef);
-      if (organizationDoc.exists()) {
-        // Adding keys
-        const secret_keysArray = organizationDoc.data().secret_keys || [];
-        const new_secret_key = {
-          change_key:
-            this.sharedService.encodeSecretKey(NewMarketplaceDto.change_key) ||
-            null,
-          stats_key:
-            this.sharedService.encodeSecretKey(NewMarketplaceDto.stats_key) ||
-            null,
-          uid: newKeyPairId,
-        };
-        secret_keysArray.push(new_secret_key);
-        await setDoc(organizationRef, {}, { merge: true });
-
-        // Adding shop
-        const shopsArray = organizationDoc.data().shops || [];
-        const new_shop = {
-          shop_name: NewMarketplaceDto.shop_name,
-          marketplace: NewMarketplaceDto.marketplace,
-          uid: newKeyPairId,
-        };
-        shopsArray.push(new_shop);
-        await setDoc(
-          organizationRef,
-          { shops: shopsArray, secret_keys: secret_keysArray },
-          { merge: true },
-        );
-      } else {
-        throw new HttpException(
-          'No such organization was found',
-          HttpStatus.NOT_FOUND,
-        );
+      const randomUUID = this.firebaseAdminService
+        .getAdminFirestore()
+        .collection('marketplaces')
+        .doc().id;
+      if (NewMarketplaceDto.default) {
+        const marketplacesRef = this.firebaseAdminService
+          .getAdminFirestore()
+          .collection('marketplaces')
+          .where('organizationId', '==', NewMarketplaceDto.organizationId)
+          .where('default', '==', true);
+        const marketplacesSnapshot = await marketplacesRef.get();
+        marketplacesSnapshot.forEach((doc) => {
+          doc.ref.update({ default: false });
+        });
       }
+      await setDoc(
+        doc(this.firebaseService.getFirestore(), 'marketplaces', randomUUID),
+        {
+          mainKey: this.sharedService.encodeSecretKey(
+            NewMarketplaceDto.mainKey.trim(),
+          ),
+          analyticsKey: this.sharedService.encodeSecretKey(
+            NewMarketplaceDto.analyticsKey.trim(),
+          ),
+          id: randomUUID,
+          name: NewMarketplaceDto.name,
+          type: NewMarketplaceDto.type,
+          default: NewMarketplaceDto.default
+            ? NewMarketplaceDto.default
+            : false,
+          organizationId: NewMarketplaceDto.organizationId,
+        },
+      );
     } catch (error) {
       const errorCode = error.code;
       const errorMessage = error.message;
@@ -69,71 +60,89 @@ export class InterfaceService {
     }
   }
 
-  async setNewKeyPair(NewKeyPairDto: NewKeyPairDto) {
+  async getMarketplaces(organizationId: string) {
+    this.logger.log(`Getting marketplaces for organization ${organizationId}`);
     try {
-      const organizationRef = doc(
-        this.firebaseService.getFirestore(),
-        'organizations',
-        NewKeyPairDto.organizationId,
+      const marketplacesRef = this.firebaseAdminService
+        .getAdminFirestore()
+        .collection('marketplaces')
+        .where('organizationId', '==', organizationId);
+      const marketplacesSnapshot = await marketplacesRef.get();
+      const marketplacesArray = [];
+      marketplacesSnapshot.forEach((doc) => {
+        const docData = doc.data();
+        marketplacesArray.push({
+          type: docData.type,
+          name: docData.name,
+          id: docData.id,
+          default: docData.default,
+        });
+      });
+      return marketplacesArray;
+    } catch (error) {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      this.logger.error(
+        `Failed to get marketplaces ${errorCode}. Message: ${errorMessage}`,
       );
-      const organizationDoc = await getDoc(organizationRef);
-      if (organizationDoc.exists()) {
-        const userInOrganization = organizationDoc
-          .data()
-          .users.find((user: { userId: string }) => {
-            if (user.userId === NewKeyPairDto.userId) {
-              return user;
-            } else {
-              return null;
-            }
-          });
-        if (!userInOrganization || userInOrganization.role !== 'admin') {
+      throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async changeMarketplaceKey(NewKeyPairDto: NewKeyPairDto) {
+    try {
+      const marketplaceRef = doc(
+        this.firebaseService.getFirestore(),
+        'marketplaces',
+        NewKeyPairDto.id,
+      );
+      const marketplaceDoc = await getDoc(marketplaceRef);
+      if (marketplaceDoc.exists()) {
+        const marketplaceData = marketplaceDoc.data();
+        if (marketplaceData.organizationId !== NewKeyPairDto.organizationId) {
           throw new HttpException(
-            "You don't have permissions",
+            'You dont have permissions to change this key',
             HttpStatus.UNAUTHORIZED,
           );
         }
-        const secret_keysArray = organizationDoc.data().secret_keys || [];
-        const uidToUpdate = secret_keysArray.pop((key: { uid: string }) => {
-          if (key.uid === NewKeyPairDto.marketplaceId) {
-            return key;
-          } else {
-            return null;
-          }
-        });
-        if (!uidToUpdate) {
-          throw new HttpException(
-            'No such marketplace was found',
-            HttpStatus.NOT_FOUND,
+        const updateData: {
+          mainKey?: string;
+          analyticsKey?: string;
+          default?: boolean;
+        } = {};
+        if (NewKeyPairDto.default) {
+          const marketplacesRef = this.firebaseAdminService
+            .getAdminFirestore()
+            .collection('marketplaces')
+            .where('organizationId', '==', NewKeyPairDto.organizationId)
+            .where('default', '==', true);
+          const marketplacesSnapshot = await marketplacesRef.get();
+          marketplacesSnapshot.forEach((doc) => {
+            doc.ref.update({ default: false });
+          });
+        }
+        if (NewKeyPairDto.mainKey) {
+          updateData.mainKey = this.sharedService.encodeSecretKey(
+            NewKeyPairDto.mainKey,
           );
         }
-
-        const new_secret_key = {
-          change_key:
-            this.sharedService.encodeSecretKey(NewKeyPairDto.change_key) ||
-            uidToUpdate.change_key,
-          stats_key:
-            this.sharedService.encodeSecretKey(NewKeyPairDto.stats_key) ||
-            uidToUpdate.stats_key,
-          uid: NewKeyPairDto.marketplaceId,
-        };
-        console.log(new_secret_key);
-        secret_keysArray.push(new_secret_key);
-
-        await setDoc(
-          organizationRef,
-          { secret_keys: secret_keysArray },
-          { merge: true },
-        );
+        if (NewKeyPairDto.analyticsKey) {
+          updateData.analyticsKey = this.sharedService.encodeSecretKey(
+            NewKeyPairDto.analyticsKey,
+          );
+        }
+        if (NewKeyPairDto.default) {
+          updateData.default = NewKeyPairDto.default;
+        }
+        await setDoc(marketplaceRef, updateData, { merge: true });
       }
     } catch (error) {
-      const errorCode =
-        error.code || error.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      const errorCode = error.code;
       const errorMessage = error.message;
       this.logger.error(
-        `Failed to assign new keypair ${errorCode}. Message: ${errorMessage}`,
+        `Failed to change marketplace key ${errorCode}. Message: ${errorMessage}`,
       );
-      throw new HttpException(errorMessage, errorCode);
+      throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

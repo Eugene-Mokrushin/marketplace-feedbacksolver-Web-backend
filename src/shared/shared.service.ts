@@ -66,10 +66,12 @@ export class SharedService {
     );
   }
 
-  buildUrl(subdomain: string, queryParams?: { [key: string]: any }): URL {
-    const url = new URL(
-      this.config.get('WILDBERRIES_FEEDBACKS_API') + subdomain,
-    );
+  buildUrl(
+    domain: string,
+    subdomain: string,
+    queryParams?: { [key: string]: any },
+  ): URL {
+    const url = new URL(this.config.get(domain) + subdomain);
     if (queryParams) {
       Object.keys(queryParams).forEach((key) => {
         url.searchParams.append(key, queryParams[key]);

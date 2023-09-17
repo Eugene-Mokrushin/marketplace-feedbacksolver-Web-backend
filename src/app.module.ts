@@ -8,6 +8,7 @@ import { TemplatesModule } from './templates/templates.module';
 import { InterfaceModule } from './interface/interface.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { SharedModule } from './shared/shared.module';
+import { QuestionsModule } from './questions/questions.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SharedModule } from './shared/shared.module';
     AuthModule,
     TemplatesModule,
     InterfaceModule,
+    QuestionsModule,
   ],
 })
 export class AppModule {}

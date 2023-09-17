@@ -9,8 +9,9 @@ import {
   WBmanyDto,
   FeedbackInterface,
   Template,
+  GetQandFNumbersDto,
 } from './feedbacksDto';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, or } from 'firebase/firestore';
 import { HttpService } from '@nestjs/axios';
 import allRussianNames from '@/dump/realRussianNames';
 import { WebsocketGateway } from '@/websocket/websocket.gateway';
@@ -30,16 +31,9 @@ export class FeedbacksService {
 
   async getWildberriesFeedbacks(GetFeedbacksDto: GetFeedbacksDto) {
     try {
-      // let secretKey = this.sharedService.decodeSecretKey(
-      //   GetFeedbacksDto.secretKey,
-      // );
-      let secretKey =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NJRCI6IjczNjk4MDg0LWY3ZGMtNDkwMS1iZGZlLWUzNDcxMGY5OTJkNyJ9.VyUKO6zkbgBgDx6rECcX_j6R5s0SRlWKMp-61nEsEB8';
-      // await this.firebaseService.checkAccessRights(
-      //   GetFeedbacksDto.organizationId,
-      //   GetFeedbacksDto.userId,
-      //   'admin',
-      // );
+      let secretKey = this.sharedService.decodeSecretKey(
+        GetFeedbacksDto.secretKey,
+      );
       if (!secretKey) {
         const organizationRef = doc(
           this.firebaseService.getFirestore(),
@@ -74,7 +68,11 @@ export class FeedbacksService {
         order: GetFeedbacksDto.isAsc ? 'dateAsc' : 'dateDesc',
       };
       const subdomain = '/api/v1/feedbacks';
-      const strUrl = this.sharedService.buildUrl(subdomain, params);
+      const strUrl = this.sharedService.buildUrl(
+        'WILDBERRIES_FEEDBACKS_API',
+        subdomain,
+        params,
+      );
       const feedbacksData = await this.sharedService.makeHttpRequest(
         this.httpService.get(strUrl.toString(), {
           headers: { Authorization: secretKey },
@@ -191,24 +189,24 @@ export class FeedbacksService {
     secretKeyEncrypted: string,
   ) {
     try {
-      const secretKey = this.sharedService.decodeSecretKey(secretKeyEncrypted);
-      if (!secretKey) {
-        throw new HttpException(
-          'No such marketplace or user or key was found',
-          HttpStatus.FORBIDDEN,
-        );
-      }
-      const body = {
-        id: ReplyDto.feedbackId,
-        text: ReplyDto.replyText,
-      };
-      const subdomain = '/api/v1/feedbacks';
-      const strUrl = this.sharedService.buildUrl(subdomain, {});
-      await this.sharedService.makeHttpRequest(
-        this.httpService.patch(strUrl.toString(), body, {
-          headers: { Authorization: secretKey },
-        }),
-      );
+      // const secretKey = this.sharedService.decodeSecretKey(secretKeyEncrypted);
+      // if (!secretKey) {
+      //   throw new HttpException(
+      //     'No such marketplace or user or key was found',
+      //     HttpStatus.FORBIDDEN,
+      //   );
+      // }
+      // const body = {
+      //   id: ReplyDto.feedbackId,
+      //   text: ReplyDto.replyText,
+      // };
+      // const subdomain = '/api/v1/feedbacks';
+      // const strUrl = this.sharedService.buildUrl('WILDBERRIES_FEEDBACKS_API', subdomain, {});
+      // await this.sharedService.makeHttpRequest(
+      //   this.httpService.patch(strUrl.toString(), body, {
+      //     headers: { Authorization: secretKey },
+      //   }),
+      // );
       return { status: 'ok' };
     } catch (error) {
       this.logger.error(error);
@@ -254,7 +252,11 @@ export class FeedbacksService {
         order: 'dateAsc',
       };
       const subdomain = '/api/v1/feedbacks';
-      const strUrlGet = this.sharedService.buildUrl(subdomain, params);
+      const strUrlGet = this.sharedService.buildUrl(
+        'WILDBERRIES_FEEDBACKS_API',
+        subdomain,
+        params,
+      );
       const feedbacksData = await this.sharedService.makeHttpRequest(
         this.httpService.get(strUrlGet.toString(), {
           headers: { Authorization: secretKey },
@@ -352,7 +354,11 @@ export class FeedbacksService {
           createdDate: element.createdDate,
         };
         const subdomain = '/api/v1/feedbacks';
-        const strUrlPutch = this.sharedService.buildUrl(subdomain, {});
+        const strUrlPutch = this.sharedService.buildUrl(
+          'WILDBERRIES_FEEDBACKS_API',
+          subdomain,
+          {},
+        );
         try {
           await this.sharedService.makeHttpRequest(
             this.httpService.patch(strUrlPutch.toString(), body, {
@@ -375,10 +381,24 @@ export class FeedbacksService {
     }
   }
 
-  async getUptoDateQandFNumbers() {
-    const secretKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NJRCI6IjczNjk4MDg0LWY3ZGMtNDkwMS1iZGZlLWUzNDcxMGY5OTJkNyJ9.VyUKO6zkbgBgDx6rECcX_j6R5s0SRlWKMp-61nEsEB8';
-    // TODO: get secretKey
+  async getUptoDateQandFNumbers(QandFDto: GetQandFNumbersDto) {
+    const organizationRef = doc(
+      this.firebaseService.getFirestore(),
+      'marketplaces',
+      QandFDto.marketplaceId,
+    );
+    const organizationDoc = await getDoc(organizationRef);
+    let secretKey = null;
+    if (organizationDoc.exists()) {
+      const organizationData = organizationDoc.data();
+      if (organizationData.organizationId !== QandFDto.organizationId) {
+        throw new HttpException(
+          'No such organization or user was found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      secretKey = this.sharedService.decodeSecretKey(organizationData.mainKey);
+    }
     const subdomainFeedbacks = '/api/v1/feedbacks';
     const subdomainQuestions = '/api/v1/questions';
     const params = {
@@ -387,8 +407,13 @@ export class FeedbacksService {
       skip: 0,
       order: 'dateAsc',
     };
-    const feedbackUrl = this.sharedService.buildUrl(subdomainFeedbacks, params);
+    const feedbackUrl = this.sharedService.buildUrl(
+      'WILDBERRIES_FEEDBACKS_API',
+      subdomainFeedbacks,
+      params,
+    );
     const questionsUrl = this.sharedService.buildUrl(
+      'WILDBERRIES_FEEDBACKS_API',
       subdomainQuestions,
       params,
     );

@@ -1,5 +1,10 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { GetFeedbacksDto, ReplyDto, WBmanyDto } from './feedbacksDto';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  GetFeedbacksDto,
+  GetQandFNumbersDto,
+  ReplyDto,
+  WBmanyDto,
+} from './feedbacksDto';
 import { FeedbacksService } from './feedbacks.service';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -24,8 +29,12 @@ export class FeedbacksController {
     return this.feedbackService.replyWildberriesFeedbackMultiple(dto);
   }
 
-  @Get('QandF/wildberries')
-  getAllWildberriesFAQ() {
-    return this.feedbackService.getUptoDateQandFNumbers();
+  @Post('QandF/wildberries')
+  getAllWildberriesFAQ(@Body() dto: GetQandFNumbersDto) {
+    if (dto.type === 'wildberries') {
+      return this.feedbackService.getUptoDateQandFNumbers(dto);
+    } else {
+      return [];
+    }
   }
 }

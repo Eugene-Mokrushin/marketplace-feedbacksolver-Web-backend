@@ -116,3 +116,14 @@ export interface Template {
   recommendation: string[] | null;
   blacklistResponse: string[] | null;
 }
+
+export class GetQandFNumbersDto {
+  @IsNotEmpty()
+  organizationId: string;
+
+  @IsNotEmpty()
+  marketplaceId: string;
+
+  @IsNotEmpty()
+  type: 'ozon' | 'wildberries' | 'yandex';
+}
