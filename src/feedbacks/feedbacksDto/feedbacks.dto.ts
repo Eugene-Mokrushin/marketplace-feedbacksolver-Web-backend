@@ -48,6 +48,26 @@ export interface KeyInterface {
   uid: string;
 }
 
+export class MassReplyDto {
+  @IsNotEmpty()
+  take: number;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  withComment: boolean;
+
+  @IsNotEmpty()
+  minEvaluation: number;
+
+  isAsc: boolean;
+  aiModel: 'gpt-3.5' | 'gpt-4';
+  templateId: string | null;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  isPersonalized: boolean;
+}
+
 export interface FilteredFiveFeedback {
   feedbackId: string;
   brand: string;

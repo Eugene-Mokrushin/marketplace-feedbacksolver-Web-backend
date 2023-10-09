@@ -16,6 +16,8 @@ import { instanceToPlain } from 'class-transformer';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
 import { Timestamp, doc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +25,8 @@ export class AuthService {
     private logger: LoggerService,
     private firebaseService: FirebaseService,
     private firebaseAdminService: FirebaseAdminService,
+    private jwt: JwtService,
+    private config: ConfigService,
   ) {}
   auth = this.firebaseService.getAuth();
 
@@ -156,5 +160,16 @@ export class AuthService {
       this.logger.error(`Error setting up User Profile: ${error}`);
       throw new HttpException(error.response, error.status);
     }
+  }
+
+  async signToken(payload: object): Promise<{ access_token: string }> {
+    const secret = this.config.get('JWT_SECRET');
+    const token = await this.jwt.signAsync(payload, {
+      expiresIn: '15m',
+      secret: secret,
+    });
+    return {
+      access_token: token,
+    };
   }
 }

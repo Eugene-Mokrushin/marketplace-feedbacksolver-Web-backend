@@ -19,7 +19,7 @@ export class OpenAIService {
           { role: 'user', content: promptUser },
         ],
         temperature: 0.4,
-        max_tokens: 150,
+        max_tokens: 200,
         frequency_penalty: 0.5,
         presence_penalty: 0.5,
       });

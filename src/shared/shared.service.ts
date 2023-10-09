@@ -90,4 +90,17 @@ export class SharedService {
       access_token: token,
     };
   }
+
+  chunkArray(array: any[], chunkSize: number) {
+    const result = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      const chunk = array.slice(i, i + chunkSize);
+      result.push(chunk);
+    }
+    return result;
+  }
+
+  delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 }
