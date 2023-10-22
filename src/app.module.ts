@@ -6,16 +6,22 @@ import { LoggerModule } from './log/logger.module';
 import { FirebaseModule } from './firebase/firebase.module';
 import { TemplatesModule } from './templates/templates.module';
 import { InterfaceModule } from './interface/interface.module';
+import { WebsocketModule } from './websocket/websocket.module';
+import { SharedModule } from './shared/shared.module';
+import { QuestionsModule } from './questions/questions.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     LoggerModule.forRoot(),
     FirebaseModule.forRoot(),
+    WebsocketModule.forRoot(),
+    SharedModule.forRoot(),
     FeedbacksModule,
     AuthModule,
     TemplatesModule,
     InterfaceModule,
+    QuestionsModule,
   ],
 })
 export class AppModule {}

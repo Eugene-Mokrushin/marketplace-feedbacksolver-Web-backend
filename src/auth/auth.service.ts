@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Credentials, CredentialsSignup, TokenUid } from './authDto';
 import { LoggerService } from '@/log/logger.service';
 import { FirebaseService } from '@/firebase/firebase.service';
@@ -11,6 +16,8 @@ import { instanceToPlain } from 'class-transformer';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
 import { Timestamp, doc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +25,8 @@ export class AuthService {
     private logger: LoggerService,
     private firebaseService: FirebaseService,
     private firebaseAdminService: FirebaseAdminService,
+    private jwt: JwtService,
+    private config: ConfigService,
   ) {}
   auth = this.firebaseService.getAuth();
 
@@ -28,11 +37,11 @@ export class AuthService {
         credentials.email,
         credentials.password,
       )
-        .then((userCredential) => {
+        .then(async (userCredential) => {
           const user = userCredential.user;
           this.firebaseService.setUser(user);
-          this.setupBasicUserProfile(user);
-          this.createNewOrganization(user);
+          const organizationId = await this.createNewOrganization(user);
+          this.setupBasicUserProfile(user, organizationId);
           this.logger.log(`Signed up ${user.uid}`);
           return user;
         })
@@ -72,10 +81,7 @@ export class AuthService {
           this.logger.error(
             `Failed to sign in ${errorCode}. Message: ${errorMessage}`,
           );
-          throw new HttpException(
-            errorMessage.replace('Firebase: ', ''),
-            HttpStatus.UNAUTHORIZED,
-          );
+          throw new UnauthorizedException(errorMessage);
         });
       return { data: response };
     } catch (error) {
@@ -118,27 +124,23 @@ export class AuthService {
         'organizations',
         newOrganizationId,
       );
-      const userRef = doc(
-        this.firebaseService.getFirestore(),
-        'users',
-        user.uid,
-      );
       await setDoc(
         organizationRef,
         {
-          users: [userRef],
+          users: [{ userId: user.uid, role: 'admin' }],
           plan: 'Basic',
           organization_name: `Организация ${user.email.split('@')[0]}`,
         },
         { merge: true },
       );
+      return newOrganizationId;
     } catch (error) {
       this.logger.error(`Error creating new organization: ${error}`);
       throw new HttpException(error.response, error.status);
     }
   }
 
-  private async setupBasicUserProfile(user: User) {
+  private async setupBasicUserProfile(user: User, organizationId: string) {
     try {
       const usersRef = doc(
         this.firebaseService.getFirestore(),
@@ -149,6 +151,7 @@ export class AuthService {
         usersRef,
         {
           users_name: user.email.split('@')[0],
+          organizations: [organizationId],
           registred_at: Timestamp.fromDate(new Date()),
         },
         { merge: true },
@@ -157,5 +160,16 @@ export class AuthService {
       this.logger.error(`Error setting up User Profile: ${error}`);
       throw new HttpException(error.response, error.status);
     }
+  }
+
+  async signToken(payload: object): Promise<{ access_token: string }> {
+    const secret = this.config.get('JWT_SECRET');
+    const token = await this.jwt.signAsync(payload, {
+      expiresIn: '15m',
+      secret: secret,
+    });
+    return {
+      access_token: token,
+    };
   }
 }

@@ -1,16 +1,51 @@
-import { IsNotEmpty } from 'class-validator';
+import { IsEmail, IsNotEmpty } from 'class-validator';
 
 export class NewMarketplaceDto {
   @IsNotEmpty()
   organizationId: string;
 
   @IsNotEmpty()
-  shop_name: string;
+  name: string;
 
-  change_key: string | null;
+  mainKey: string | null;
 
-  stats_key: string | null;
+  analyticsKey: string | null;
+
+  default: boolean | null;
 
   @IsNotEmpty()
-  marketplace: 'Wilberries' | 'Ozon' | 'Yandex';
+  type: 'wilberries' | 'ozon' | 'yandex';
+}
+
+export class AddUserDto {
+  @IsEmail()
+  userToAdd: string;
+
+  @IsNotEmpty()
+  userSetter: string;
+
+  @IsNotEmpty()
+  organizationId: string;
+
+  @IsNotEmpty()
+  role: string;
+}
+
+export class NewKeyPairDto {
+  @IsNotEmpty()
+  organizationId: string;
+
+  mainKey: string | null;
+
+  analyticsKey: string | null;
+
+  default: boolean | null;
+
+  @IsNotEmpty()
+  id: string;
+}
+
+export class OrganizationIdDto {
+  @IsNotEmpty()
+  organizationId: string;
 }

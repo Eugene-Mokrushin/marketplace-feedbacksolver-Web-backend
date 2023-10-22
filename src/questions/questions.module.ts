@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { FeedbacksService } from './feedbacks.service';
-import { FeedbacksController } from './feedbacks.controller';
+import { QuestionsController } from './questions.controller';
+import { QuestionsService } from './questions.service';
 import { HttpModule } from '@nestjs/axios';
 import { SharedModule } from '@/shared/shared.module';
 import { OpenAIService } from '@/openai/openai.service';
 
 @Module({
   imports: [HttpModule, SharedModule],
-  controllers: [FeedbacksController],
-  providers: [FeedbacksService, OpenAIService],
+  controllers: [QuestionsController],
+  providers: [QuestionsService, OpenAIService],
 })
-export class FeedbacksModule {}
+export class QuestionsModule {}

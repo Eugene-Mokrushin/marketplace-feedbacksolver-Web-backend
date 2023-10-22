@@ -22,3 +22,8 @@ export class TokenUid {
   @IsNotEmpty()
   idToken: string;
 }
+
+export class NewTokenDto {
+  @IsNotEmpty()
+  shopId: string;
+}
