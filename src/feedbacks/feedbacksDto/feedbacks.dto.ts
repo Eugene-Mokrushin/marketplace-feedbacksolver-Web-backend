@@ -60,7 +60,7 @@ export class MassReplyDto {
   minEvaluation: number;
 
   isAsc: boolean;
-  aiModel: 'gpt-3.5' | 'gpt-4';
+  aiModel: 'gpt-3.5-turbo' | 'gpt-4';
   templateId: string | null;
 
   @IsNotEmpty()

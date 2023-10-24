@@ -421,7 +421,7 @@ export class FeedbacksService {
         );
       }
       const secretKey = this.sharedService.decodeSecretKey(token);
-
+      this.logger.log('Mass reply started. Token confirmed');
       // 1. Get feedbacks
       const feedbacks = await this.getNFeedbacksWB(
         MassReplyDto.take,
@@ -454,9 +454,10 @@ export class FeedbacksService {
       // 3. Generate responses
       let suggestions: { id: string; reply: string }[] = [];
       // Split feedbacks into chunks of 100
-      const chunkedFeedbacks = this.sharedService
-        .chunkArray(feedbacks, 80)
-        .splice(5) as FeedbackInterface[][];
+      const chunkedFeedbacks = this.sharedService.chunkArray(
+        feedbacks,
+        80,
+      ) as FeedbackInterface[][];
       // Generate suggestions for each chunk
       for (let i = 0; i < chunkedFeedbacks.length; i++) {
         const chunk = chunkedFeedbacks[i];
@@ -465,7 +466,7 @@ export class FeedbacksService {
         );
         // Skip chunk if it's not the first one and takes more than 1 minute to generate
         if (i !== 0) {
-          await this.sharedService.delay(60001);
+          await this.sharedService.delay(30001);
         }
         const chunkSuggestions = await this.generateAIResponse(
           chunk,
@@ -482,9 +483,11 @@ export class FeedbacksService {
         }
       }
       this.logger.log('Got suggestions, n: ' + suggestions.length);
-
+      suggestions.forEach((suggestion) => {
+        console.log(suggestion.reply);
+      });
       // 4. Reply to feedbacks
-      await this.replyFeedbacksWB(suggestions, secretKey);
+      // await this.replyFeedbacksWB(suggestions, secretKey);
       return { status: 'ok' };
     } catch (error) {
       this.logger.error(error);
@@ -504,61 +507,34 @@ export class FeedbacksService {
     toGenerate: FeedbackInterface[],
     isPersonalized: boolean,
     numSuggestions: number,
-    model: 'gpt-3.5' | 'gpt-4',
+    model: 'gpt-3.5-turbo' | 'gpt-4',
   ) {
-    switch (model) {
-      case 'gpt-3.5':
-        const responsesPromised = await Promise.all(
-          toGenerate.map(async (feedback) => {
-            const isValidUserName =
-              isPersonalized && this.isNameValid(feedback.userName);
-            const productName = feedback.productDetails?.productName || '';
-            const brandName = feedback.productDetails?.brandName || '';
-            const score = feedback.productValuation?.toString() || '';
-            const promptUser = prompts.ru.gpt3_5.wildberries.user
-              .replace('%PRODUCT_NAME%', productName)
-              .replace('%BRAND%', brandName)
-              .replace('%SCORE%', score)
-              .replace('%FEEDBACK%', feedback.text);
-
-            let promptSystem = prompts.ru.gpt3_5.wildberries.system.replace(
-              '%BRAND%',
-              brandName,
-            );
-            if (isValidUserName) {
-              promptSystem +=
-                ' ' +
-                prompts.ru.gpt3_5.wildberries.by_name.replace(
-                  '%BUYER_NAME%',
-                  feedback.userName,
-                );
-            }
-
-            const responsePromises = Array.from({
-              length: numSuggestions || 1,
-            }).map(async (_, index) => ({
-              id: feedback.id + '%' + index,
-              reply: await this.openaiService.getResponseV3p5(
-                promptUser,
-                promptSystem,
-              ),
-            }));
-
-            return Promise.all(responsePromises);
-          }),
-        );
-
-        // Flatten the nested arrays of promises and responses
-        const responses = responsesPromised.flat();
-        return responses;
-
-      case 'gpt-4':
-        // TODO: Implement GPT-4
-        return null;
-
-      default:
-        return null;
-    }
+    const responsesPromised = await Promise.all(
+      toGenerate.map(async (feedback) => {
+        const isValidUserName =
+          isPersonalized && this.isNameValid(feedback.userName);
+        const responsePromises = Array.from({
+          length: numSuggestions || 1,
+        }).map(async (_, index) => ({
+          id: feedback.id + '%' + index,
+          reply: await this.openaiService.generateFeedbackReply(
+            model,
+            isPersonalized,
+            {
+              brand: feedback?.productDetails?.brandName,
+              product_name: feedback?.productDetails?.productName,
+              score: feedback.productValuation.toString(),
+              feedback: feedback.text,
+              buyer_name: isValidUserName ? feedback.userName : null,
+            },
+          ),
+        }));
+        return Promise.all(responsePromises);
+      }),
+    );
+    // Flatten the nested arrays of promises and responses
+    const responses = responsesPromised.flat();
+    return responses;
   }
 
   /**
@@ -616,9 +592,15 @@ export class FeedbacksService {
           `Replying to chunk ${i + 1}/${chunkedFeedbacks.length}`,
         );
         const promises = chunk.map(async (element, j) => {
-          const id = element.id.split('%')[0];
-          const text = element.reply.replaceAll('/', '').replaceAll('\\', '');
-          if (id && text.length > 10) {
+          const id = element?.id?.split('%')[0];
+          const text = element?.reply?.replaceAll('/', '').replaceAll('\\', '');
+          if (
+            id &&
+            text?.length > 10 &&
+            text !== 'undefined' &&
+            text !== 'null' &&
+            text
+          ) {
             const body = { id, text };
             const subdomain = '/api/v1/feedbacks';
             const strUrl = this.sharedService.buildUrl(
