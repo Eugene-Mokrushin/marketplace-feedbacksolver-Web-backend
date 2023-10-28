@@ -1,4 +1,10 @@
-import { IsBoolean, IsNotEmpty, IsInt, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsInt,
+  IsString,
+  IsNumber,
+} from 'class-validator';
 
 export class GetFeedbacksDto {
   @IsNotEmpty()
@@ -62,6 +68,9 @@ export class MassReplyDto {
   isAsc: boolean;
   aiModel: 'gpt-3.5-turbo' | 'gpt-4';
   templateId: string | null;
+
+  @IsNumber()
+  emojiProbability: number;
 
   @IsNotEmpty()
   @IsBoolean()

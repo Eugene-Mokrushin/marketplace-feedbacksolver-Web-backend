@@ -23,10 +23,11 @@ export class OpenAIService {
     try {
       const llm = new OpenAI({
         modelName,
-        temperature: 0,
+        temperature: 0.4,
         maxTokens: 200,
         frequencyPenalty: 0.5,
         presencePenalty: 0.5,
+        topP: 1,
       });
       const prompt = new PromptTemplate({
         inputVariables: [
@@ -36,9 +37,13 @@ export class OpenAIService {
           'feedback',
           'buyer_name',
         ],
-        template: `Ты представитель бренда {brand}, один из многих продавцов, который продает товары на маркетплейсе. Твоя задача ответить на отзыв. Будь менее официален но обращайся на Вы, уложись масимум в 40-60 слов. Не упоминай про маркетплейс и название купленного продукта, не перефразируй название продукта! На товар {product_name}, бренда {brand} поступил отзыв, с оценкой {score} из 5. Отзыв: {feedback}. ${
+        template: `Ты представитель бренда {brand}, один из многих продавцов, который продает продукты на маркетплейсе. Твоя задача ответить на отзыв. Будь менее официален но обращайся на Вы, при обращении не пиши слово привет, уложись масимум в 40-60 слов. Не упоминай про маркетплейс и название купленного продукта!  На товар {product_name}, бренда {brand} поступил отзыв, с оценкой {score} из 5. Отзыв: {feedback}. ${
           isPersonalized && feedbackParams.buyer_name
-            ? 'Обратись к пользователю по имени {buyer_name}.'
+            ? 'Обратись к пользователю по имени {buyer_name}. '
+            : ''
+        } ${
+          feedbackParams.use_emoji
+            ? 'Где уместно, добавь эмодзи по контексту.'
             : ''
         }`,
       });
@@ -51,13 +56,11 @@ export class OpenAIService {
         buyer_name: feedbackParams.buyer_name,
       });
 
-      console.log(formatedPrompt);
-
       const reply = await llm.call(formatedPrompt, { timeout: 30000 });
       return reply;
     } catch (error) {
       this.logger.error(error);
-      return error;
+      return null;
     }
   }
 }

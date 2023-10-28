@@ -4,4 +4,5 @@ export interface FeedbackParams {
   score: string;
   feedback: string;
   buyer_name?: string;
+  use_emoji: boolean;
 }

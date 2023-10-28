@@ -473,6 +473,7 @@ export class FeedbacksService {
           MassReplyDto.isPersonalized,
           1,
           MassReplyDto.aiModel,
+          MassReplyDto.emojiProbability,
         );
         // If response is array
         if (Array.isArray(chunkSuggestions)) {
@@ -483,11 +484,9 @@ export class FeedbacksService {
         }
       }
       this.logger.log('Got suggestions, n: ' + suggestions.length);
-      suggestions.forEach((suggestion) => {
-        console.log(suggestion.reply);
-      });
+
       // 4. Reply to feedbacks
-      // await this.replyFeedbacksWB(suggestions, secretKey);
+      await this.replyFeedbacksWB(suggestions, secretKey);
       return { status: 'ok' };
     } catch (error) {
       this.logger.error(error);
@@ -501,6 +500,7 @@ export class FeedbacksService {
    * @param isPersonalized Whether to personalize the responses.
    * @param numSuggestions Number of suggestions to generate for each feedback.
    * @param model AI model to use for generating responses.
+   * @param emojiProbability Probability of emoji to use in responses.
    * @returns List of suggested responses for each feedback as {id: string_INDEX, reply: string}[][].
    */
   private async generateAIResponse(
@@ -508,11 +508,13 @@ export class FeedbacksService {
     isPersonalized: boolean,
     numSuggestions: number,
     model: 'gpt-3.5-turbo' | 'gpt-4',
+    emojiProbability: number,
   ) {
     const responsesPromised = await Promise.all(
       toGenerate.map(async (feedback) => {
         const isValidUserName =
           isPersonalized && this.isNameValid(feedback.userName);
+        const useEmoji = this.followProbability(emojiProbability);
         const responsePromises = Array.from({
           length: numSuggestions || 1,
         }).map(async (_, index) => ({
@@ -526,6 +528,7 @@ export class FeedbacksService {
               score: feedback.productValuation.toString(),
               feedback: feedback.text,
               buyer_name: isValidUserName ? feedback.userName : null,
+              use_emoji: useEmoji,
             },
           ),
         }));
@@ -819,5 +822,9 @@ export class FeedbacksService {
       this.logger.error(error);
       throw new HttpException('Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+  private followProbability(probability: number): boolean {
+    const random = Math.random();
+    return random <= probability;
   }
 }
