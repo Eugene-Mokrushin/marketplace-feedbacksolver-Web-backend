@@ -49,3 +49,11 @@ export class OrganizationIdDto {
   @IsNotEmpty()
   organizationId: string;
 }
+
+export class UpdateProfilePictureDto {
+  @IsNotEmpty()
+  uid: string;
+
+  @IsNotEmpty()
+  previousImage: string;
+}

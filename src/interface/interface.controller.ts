@@ -1,6 +1,20 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { InterfaceService } from './interface.service';
-import { AddUserDto, NewKeyPairDto, NewMarketplaceDto } from './interfaceDto';
+import {
+  AddUserDto,
+  NewKeyPairDto,
+  NewMarketplaceDto,
+  UpdateProfilePictureDto,
+} from './interfaceDto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('interface')
 export class InterfaceController {
@@ -24,5 +38,14 @@ export class InterfaceController {
   @Post('addUserToOragnization')
   addUserToOrganization(@Body() dto: AddUserDto) {
     return this.interfaceService.addUserToOrganization(dto);
+  }
+
+  @Post('updateProfilePicture')
+  @UseInterceptors(FileInterceptor('file'))
+  updateProfilePicture(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: UpdateProfilePictureDto,
+  ) {
+    return this.interfaceService.updateProfilePicture(file, dto);
   }
 }

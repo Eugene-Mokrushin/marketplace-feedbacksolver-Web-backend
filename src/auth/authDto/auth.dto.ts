@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { IsStrongPassword } from '@decorators/is-strong-password.decorator';
 import { Match } from '@/decorators/match.decorator';
 
@@ -16,6 +16,10 @@ export class CredentialsSignup extends Credentials {
   @IsNotEmpty({ message: 'Повторите пароль' })
   @Match('password')
   password_repeat: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Укажите имя' })
+  organizationName: string;
 }
 
 export class TokenUid {

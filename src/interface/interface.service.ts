@@ -1,10 +1,22 @@
 import { FirebaseService } from '@/firebase/firebase.service';
 import { LoggerService } from '@/log/logger.service';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { NewMarketplaceDto, AddUserDto, NewKeyPairDto } from './interfaceDto';
+import {
+  NewMarketplaceDto,
+  AddUserDto,
+  NewKeyPairDto,
+  UpdateProfilePictureDto,
+} from './interfaceDto';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
 import { SharedService } from '@/shared/shared.service';
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from 'firebase/storage';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class InterfaceService {
@@ -13,6 +25,7 @@ export class InterfaceService {
     private firebaseService: FirebaseService,
     private firebaseAdminService: FirebaseAdminService,
     private sharedService: SharedService,
+    private config: ConfigService,
   ) {}
 
   async addNewMarketplace(NewMarketplaceDto: NewMarketplaceDto) {
@@ -212,6 +225,54 @@ export class InterfaceService {
         `Failed to assign new user - ${AddUserDto.userToAdd} to organization - ${AddUserDto.organizationId}. ${errorCode}. Message: ${errorMessage}`,
       );
       throw new HttpException(errorMessage, errorCode);
+    }
+  }
+
+  async updateProfilePicture(
+    picture: Express.Multer.File,
+    dto: UpdateProfilePictureDto,
+  ) {
+    const illegalCharsRegex = /[^a-zA-Z0-9-_.~/]+/g;
+
+    const storageRef = ref(
+      this.firebaseService.getStorage(),
+      'profilePictures/' +
+        dto.uid +
+        '_' +
+        picture.originalname.replace(illegalCharsRegex, '_'),
+    );
+    try {
+      const snapshot = await uploadBytes(storageRef, picture.buffer);
+      const downloadUrl = await getDownloadURL(
+        ref(this.firebaseService.getStorage(), snapshot.metadata.fullPath),
+      );
+      const userRef = doc(
+        this.firebaseService.getFirestore(),
+        'users',
+        dto.uid,
+      );
+      try {
+        const parsedUrl = new URL(dto.previousImage);
+        if (parsedUrl?.hostname === 'firebasestorage.googleapis.com') {
+          const path = parsedUrl.pathname;
+          const filename = path
+            .split('/')
+            .pop()
+            .replace('%20', ' ')
+            .replace('%2F', '/');
+          const prevImageRef = ref(this.firebaseService.getStorage(), filename);
+          await deleteObject(prevImageRef);
+        } else {
+          this.logger.log('The URL is not from firebasestorage.googleapis.com');
+        }
+      } catch (error) {
+        this.logger.error(`Failed to delete previous image. ${error}`);
+      }
+      await setDoc(userRef, { image: downloadUrl }, { merge: true });
+      return { url: downloadUrl };
+    } catch (error) {
+      console.error('Error uploading the file:', error);
+      throw new Error('File upload failed');
     }
   }
 }

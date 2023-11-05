@@ -14,8 +14,7 @@ import {
 } from 'firebase/auth';
 import { instanceToPlain } from 'class-transformer';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
-import { Timestamp, doc, setDoc } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
+import { doc, setDoc } from 'firebase/firestore';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -40,8 +39,7 @@ export class AuthService {
         .then(async (userCredential) => {
           const user = userCredential.user;
           this.firebaseService.setUser(user);
-          const organizationId = await this.createNewOrganization(user);
-          this.setupBasicUserProfile(user, organizationId);
+          this.setupBasicUserProfile(user, credentials.organizationName);
           this.logger.log(`Signed up ${user.uid}`);
           return user;
         })
@@ -89,20 +87,6 @@ export class AuthService {
     }
   }
 
-  // TODO: Fix signing up/in with Googl
-  async signWithGoogle(idTokenDto: TokenUid) {
-    try {
-      const idTokenPlain = instanceToPlain(idTokenDto);
-      const adminApp = this.firebaseAdminService
-        .getAdminAuth()
-        .verifyIdToken(idTokenPlain.idToken);
-      console.log(adminApp);
-    } catch (error) {
-      this.logger.error(`Error signing in with Google: ${error}`);
-      throw new Error('An error occurred while signing in with Google');
-    }
-  }
-
   private async checkIfUserExists(googleUserId: string): Promise<boolean> {
     try {
       const user = await this.firebaseAdminService
@@ -116,31 +100,7 @@ export class AuthService {
     }
   }
 
-  private async createNewOrganization(user: User) {
-    try {
-      const newOrganizationId = uuidv4();
-      const organizationRef = doc(
-        this.firebaseService.getFirestore(),
-        'organizations',
-        newOrganizationId,
-      );
-      await setDoc(
-        organizationRef,
-        {
-          users: [{ userId: user.uid, role: 'admin' }],
-          plan: 'Basic',
-          organization_name: `Организация ${user.email.split('@')[0]}`,
-        },
-        { merge: true },
-      );
-      return newOrganizationId;
-    } catch (error) {
-      this.logger.error(`Error creating new organization: ${error}`);
-      throw new HttpException(error.response, error.status);
-    }
-  }
-
-  private async setupBasicUserProfile(user: User, organizationId: string) {
+  private async setupBasicUserProfile(user: User, organizationName: string) {
     try {
       const usersRef = doc(
         this.firebaseService.getFirestore(),
@@ -150,9 +110,10 @@ export class AuthService {
       await setDoc(
         usersRef,
         {
-          users_name: user.email.split('@')[0],
-          organizations: [organizationId],
-          registred_at: Timestamp.fromDate(new Date()),
+          email: user.email,
+          emailVerified: null,
+          image: null,
+          name: organizationName,
         },
         { merge: true },
       );

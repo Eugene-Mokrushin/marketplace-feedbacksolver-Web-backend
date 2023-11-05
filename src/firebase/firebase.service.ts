@@ -5,6 +5,7 @@ import { Auth, User, getAuth } from 'firebase/auth';
 import { Database, getDatabase } from 'firebase/database';
 import { Firestore, getFirestore, doc, getDoc } from 'firebase/firestore';
 import { UserInterface } from './firebaseDto';
+import { FirebaseStorage, getStorage } from 'firebase/storage';
 
 @Injectable()
 export class FirebaseService {
@@ -12,6 +13,7 @@ export class FirebaseService {
   private readonly auth: Auth;
   private readonly RtDB: Database;
   private readonly Firestore: Firestore;
+  private readonly storage: FirebaseStorage;
   private user: User;
 
   constructor(private config: ConfigService) {
@@ -35,6 +37,10 @@ export class FirebaseService {
     this.RtDB = RtDB;
     const firestore = getFirestore(this.app);
     this.Firestore = firestore;
+    this.storage = getStorage(
+      this.app,
+      `gs://${this.config.get('FIREBASE_STORAGE_BUCKET')}`,
+    );
   }
 
   getRtDB() {
@@ -55,6 +61,10 @@ export class FirebaseService {
 
   setUser(user: User) {
     this.user = user;
+  }
+
+  getStorage() {
+    return this.storage;
   }
 
   async checkAccessRights(

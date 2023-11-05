@@ -21,11 +21,6 @@ export class AuthController {
     return this.authService.signIn(dto);
   }
 
-  @Post('/googleSignin')
-  googleSignin(@Body() dto: TokenUid) {
-    return this.authService.signWithGoogle(dto);
-  }
-
   @Post('newToken')
   signToken(@Body() dto: NewTokenDto) {
     return this.authService.signToken(dto);
