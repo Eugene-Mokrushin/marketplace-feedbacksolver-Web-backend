@@ -17,6 +17,16 @@ export class NewMarketplaceDto {
   type: 'wilberries' | 'ozon' | 'yandex';
 }
 
+export class UpdateMarketplaceDto {
+  @IsNotEmpty()
+  organizationId: string;
+
+  name?: string;
+  mainKey?: string;
+  analyticsKey?: string;
+  default?: boolean;
+}
+
 export class AddUserDto {
   @IsEmail()
   userToAdd: string;

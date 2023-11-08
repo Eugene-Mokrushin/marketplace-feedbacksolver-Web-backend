@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
+  Put,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -12,6 +14,7 @@ import {
   AddUserDto,
   NewKeyPairDto,
   NewMarketplaceDto,
+  UpdateMarketplaceDto,
   UpdateProfilePictureDto,
 } from './interfaceDto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -28,6 +31,19 @@ export class InterfaceController {
   @Post('addMarketplace')
   addMarketplace(@Body() dto: NewMarketplaceDto) {
     return this.interfaceService.addNewMarketplace(dto);
+  }
+
+  @Put('updateMarketplace/:marketplaceId')
+  updateMarketplace(
+    @Param('marketplaceId') marketplaceId: string,
+    @Body() dto: UpdateMarketplaceDto,
+  ) {
+    return this.interfaceService.updateMarketplace(marketplaceId, dto);
+  }
+
+  @Delete('deleteMarketplace/:marketplaceId')
+  deleteMarketplace(@Param('marketplaceId') marketplaceId: string) {
+    return this.interfaceService.deleteMarketplace(marketplaceId);
   }
 
   @Post('changeMarketplaceKey')

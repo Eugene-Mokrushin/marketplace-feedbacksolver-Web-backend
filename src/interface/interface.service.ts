@@ -6,8 +6,9 @@ import {
   AddUserDto,
   NewKeyPairDto,
   UpdateProfilePictureDto,
+  UpdateMarketplaceDto,
 } from './interfaceDto';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { FirebaseAdminService } from '@/firebase/firebase.admin.service';
 import { SharedService } from '@/shared/shared.service';
 import {
@@ -27,6 +28,35 @@ export class InterfaceService {
     private sharedService: SharedService,
     private config: ConfigService,
   ) {}
+
+  async getMarketplaces(organizationId: string) {
+    this.logger.log(`Getting marketplaces for organization ${organizationId}`);
+    try {
+      const marketplacesRef = this.firebaseAdminService
+        .getAdminFirestore()
+        .collection('marketplaces')
+        .where('organizationId', '==', organizationId);
+      const marketplacesSnapshot = await marketplacesRef.get();
+      const marketplacesArray = [];
+      marketplacesSnapshot.forEach((doc) => {
+        const docData = doc.data();
+        marketplacesArray.push({
+          type: docData.type,
+          name: docData.name,
+          id: docData.id,
+          default: docData.default,
+        });
+      });
+      return marketplacesArray;
+    } catch (error) {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      this.logger.error(
+        `Failed to get marketplaces ${errorCode}. Message: ${errorMessage}`,
+      );
+      throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 
   async addNewMarketplace(NewMarketplaceDto: NewMarketplaceDto) {
     try {
@@ -63,6 +93,7 @@ export class InterfaceService {
           organizationId: NewMarketplaceDto.organizationId,
         },
       );
+      return { createdId: randomUUID };
     } catch (error) {
       const errorCode = error.code;
       const errorMessage = error.message;
@@ -73,30 +104,74 @@ export class InterfaceService {
     }
   }
 
-  async getMarketplaces(organizationId: string) {
-    this.logger.log(`Getting marketplaces for organization ${organizationId}`);
+  async updateMarketplace(
+    matkeplaceId: string,
+    UpdatedMarketplaceDto: UpdateMarketplaceDto,
+  ) {
     try {
-      const marketplacesRef = this.firebaseAdminService
-        .getAdminFirestore()
-        .collection('marketplaces')
-        .where('organizationId', '==', organizationId);
-      const marketplacesSnapshot = await marketplacesRef.get();
-      const marketplacesArray = [];
-      marketplacesSnapshot.forEach((doc) => {
-        const docData = doc.data();
-        marketplacesArray.push({
-          type: docData.type,
-          name: docData.name,
-          id: docData.id,
-          default: docData.default,
+      const marketplaceRef = doc(
+        this.firebaseService.getFirestore(),
+        'marketplaces',
+        matkeplaceId,
+      );
+
+      const updateData: {
+        mainKey?: string;
+        analyticsKey?: string;
+        name?: string;
+        default?: boolean;
+      } = {};
+      if (UpdatedMarketplaceDto.mainKey) {
+        updateData.mainKey = this.sharedService.encodeSecretKey(
+          UpdatedMarketplaceDto.mainKey,
+        );
+      }
+      if (UpdatedMarketplaceDto.analyticsKey) {
+        updateData.analyticsKey = this.sharedService.encodeSecretKey(
+          UpdatedMarketplaceDto.analyticsKey,
+        );
+      }
+      if (UpdatedMarketplaceDto.name) {
+        updateData.name = UpdatedMarketplaceDto.name;
+      }
+      if ('default' in UpdatedMarketplaceDto) {
+        updateData.default = UpdatedMarketplaceDto.default;
+      }
+      if (UpdatedMarketplaceDto.default) {
+        const marketplacesRef = this.firebaseAdminService
+          .getAdminFirestore()
+          .collection('marketplaces')
+          .where('organizationId', '==', UpdatedMarketplaceDto.organizationId)
+          .where('default', '==', true);
+        const marketplacesSnapshot = await marketplacesRef.get();
+        marketplacesSnapshot.forEach((doc) => {
+          doc.ref.update({ default: false });
         });
-      });
-      return marketplacesArray;
+      }
+      await setDoc(marketplaceRef, updateData, { merge: true });
     } catch (error) {
       const errorCode = error.code;
       const errorMessage = error.message;
       this.logger.error(
-        `Failed to get marketplaces ${errorCode}. Message: ${errorMessage}`,
+        `Failed to update marketplace ${errorCode}. Message: ${errorMessage}`,
+      );
+      throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async deleteMarketplace(marketplaceId: string) {
+    const ref = doc(
+      this.firebaseService.getFirestore(),
+      'marketplaces',
+      marketplaceId,
+    );
+    try {
+      await deleteDoc(ref);
+    } catch (error) {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      this.logger.error(
+        `Failed to delete marketplace ${errorCode}. Message: ${errorMessage}`,
       );
       throw new HttpException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
     }
