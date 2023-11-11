@@ -104,15 +104,12 @@ export class InterfaceService {
     }
   }
 
-  async updateMarketplace(
-    matkeplaceId: string,
-    UpdatedMarketplaceDto: UpdateMarketplaceDto,
-  ) {
+  async updateMarketplace(dto: UpdateMarketplaceDto) {
     try {
       const marketplaceRef = doc(
         this.firebaseService.getFirestore(),
         'marketplaces',
-        matkeplaceId,
+        dto.marketplaceId,
       );
 
       const updateData: {
@@ -121,27 +118,25 @@ export class InterfaceService {
         name?: string;
         default?: boolean;
       } = {};
-      if (UpdatedMarketplaceDto.mainKey) {
-        updateData.mainKey = this.sharedService.encodeSecretKey(
-          UpdatedMarketplaceDto.mainKey,
-        );
+      if (dto.mainKey) {
+        updateData.mainKey = this.sharedService.encodeSecretKey(dto.mainKey);
       }
-      if (UpdatedMarketplaceDto.analyticsKey) {
+      if (dto.analyticsKey) {
         updateData.analyticsKey = this.sharedService.encodeSecretKey(
-          UpdatedMarketplaceDto.analyticsKey,
+          dto.analyticsKey,
         );
       }
-      if (UpdatedMarketplaceDto.name) {
-        updateData.name = UpdatedMarketplaceDto.name;
+      if (dto.name) {
+        updateData.name = dto.name;
       }
-      if ('default' in UpdatedMarketplaceDto) {
-        updateData.default = UpdatedMarketplaceDto.default;
+      if ('default' in dto) {
+        updateData.default = dto.isDefault;
       }
-      if (UpdatedMarketplaceDto.default) {
+      if (dto.isDefault) {
         const marketplacesRef = this.firebaseAdminService
           .getAdminFirestore()
           .collection('marketplaces')
-          .where('organizationId', '==', UpdatedMarketplaceDto.organizationId)
+          .where('organizationId', '==', dto.organizationId)
           .where('default', '==', true);
         const marketplacesSnapshot = await marketplacesRef.get();
         marketplacesSnapshot.forEach((doc) => {

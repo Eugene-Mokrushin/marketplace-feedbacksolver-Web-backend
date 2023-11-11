@@ -5,7 +5,6 @@ import {
   Get,
   Param,
   Post,
-  Put,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -33,12 +32,9 @@ export class InterfaceController {
     return this.interfaceService.addNewMarketplace(dto);
   }
 
-  @Put('updateMarketplace/:marketplaceId')
-  updateMarketplace(
-    @Param('marketplaceId') marketplaceId: string,
-    @Body() dto: UpdateMarketplaceDto,
-  ) {
-    return this.interfaceService.updateMarketplace(marketplaceId, dto);
+  @Post('updateMarketplace')
+  updateMarketplace(@Body() dto: UpdateMarketplaceDto) {
+    return this.interfaceService.updateMarketplace(dto);
   }
 
   @Delete('deleteMarketplace/:marketplaceId')

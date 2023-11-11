@@ -19,12 +19,15 @@ export class NewMarketplaceDto {
 
 export class UpdateMarketplaceDto {
   @IsNotEmpty()
+  marketplaceId: string;
+
+  @IsNotEmpty()
   organizationId: string;
 
   name?: string;
   mainKey?: string;
   analyticsKey?: string;
-  default?: boolean;
+  isDefault?: boolean;
 }
 
 export class AddUserDto {
