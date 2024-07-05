@@ -404,23 +404,24 @@ export class FeedbacksService {
 
     try {
       // 0. Check for token
-      const organizationRef = doc(
-        this.firebaseService.getFirestore(),
-        'marketplaces',
-        shopId,
-      );
-      const organizationDoc = await getDoc(organizationRef);
-      let token = null;
-      if (organizationDoc.exists()) {
-        const organizationData = organizationDoc.data();
-        token = organizationData.mainKey;
-      } else {
-        throw new HttpException(
-          'No such organization or user was found',
-          HttpStatus.NOT_FOUND,
-        );
-      }
-      const secretKey = this.sharedService.decodeSecretKey(token);
+      // const organizationRef = doc(
+      //   this.firebaseService.getFirestore(),
+      //   'marketplaces',
+      //   shopId,
+      // );
+      // const organizationDoc = await getDoc(organizationRef);
+      // let token = null;
+      // if (organizationDoc.exists()) {
+      //   const organizationData = organizationDoc.data();
+      //   token = organizationData.mainKey;
+      // } else {
+      //   throw new HttpException(
+      //     'No such organization or user was found',
+      //     HttpStatus.NOT_FOUND,
+      //   );
+      // }
+      const secretKey =
+        'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjQwMjI2djEiLCJ0eXAiOiJKV1QifQ.eyJlbnQiOjEsImV4cCI6MTcyOTIxOTQ5NSwiaWQiOiJhYjlhYjIwOC0yNGZjLTQ3NjYtOTc5Ni1iZTAyZWNkZGE5ZjQiLCJpaWQiOjM2Njk1NzAzLCJvaWQiOjEzMjAxMjEsInMiOjEyOCwic2lkIjoiMzY5MmNiMGYtY2JmZS00ZmRmLTk3MTQtOWM1OTg2N2RhNzQ5IiwidCI6ZmFsc2UsInVpZCI6MzY2OTU3MDN9.h-vuFafLP0SlWrNBq0JPirhEY4elNAbrErYG0MzgI0ish9AuXP5DzhM9XNGgGKbwQAXyo_iSRDLUcbz8fsU_mw';
       this.logger.log('Mass reply started. Token confirmed');
       // 1. Get feedbacks
       const feedbacks = await this.getNFeedbacksWB(
@@ -584,7 +585,7 @@ export class FeedbacksService {
   ) {
     try {
       // Split feedbacks into chunks of 50
-      const chunkedFeedbacks = this.sharedService.chunkArray(feedbacks, 50) as {
+      const chunkedFeedbacks = this.sharedService.chunkArray(feedbacks, 1) as {
         id: string;
         reply: string;
       }[][];
@@ -635,7 +636,7 @@ export class FeedbacksService {
         });
         await Promise.all(promises);
         this.logger.log('Replied to chunk ' + (i + 1));
-        await this.sharedService.delay(3000);
+        await this.sharedService.delay(300);
       }
       return 0;
     } catch (error) {

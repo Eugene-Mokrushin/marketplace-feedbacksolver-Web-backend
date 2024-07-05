@@ -9,7 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:dev": "concurrently \"nest start --watch\" \"wait-on dist/main.js & npm run copy:templates\"",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -17,7 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "copy:templates": "copyfiles -u 1 src/templates/templateFiles/**/* dist"
   },
   "dependencies": {
     "@firebase/app": "^0.9.13",
@@ -41,6 +42,7 @@
     "firebase": "^9.23.0",
     "firebase-admin": "^11.9.0",
     "google-auth-library": "^8.9.0",
+    "kata-numbers-to-french": "^0.0.1",
     "langchain": "^0.0.170",
     "openai": "^4.4.0",
     "passport-jwt": "^4.0.1",
@@ -64,6 +66,7 @@
     "@types/uuid": "^9.0.2",
     "@typescript-eslint/eslint-plugin": "^5.59.11",
     "@typescript-eslint/parser": "^5.59.11",
+    "copyfiles": "^2.4.1",
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-prettier": "^4.2.1",

@@ -20,6 +20,7 @@ export class QuestionsService {
   ) {}
 
   async getSampleWildberries(dto: SampleDto) {
+    console.log('Sample!');
     try {
       const organizationRef = doc(
         this.firebaseService.getFirestore(),

@@ -5,14 +5,15 @@ export class NewFileDto {
   fileName: string;
 
   @IsNotEmpty()
-  organizationUid: string;
+  organizationId: string;
 
   @IsNotEmpty()
-  userId: string;
+  typeFill: 'blanks' | 'AIs';
 }
 
 export class RawData {
-  articleWB: string | null;
+  category: string | null;
+  article: string | null;
   brand: string | null;
   rating: number | null;
   response: string[] | null;

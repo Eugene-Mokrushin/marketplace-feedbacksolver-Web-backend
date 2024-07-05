@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { getStorage, ref, uploadBytes } from 'firebase/storage';
+import { ref, uploadBytes } from 'firebase/storage';
 import { LoggerService } from '@/log/logger.service';
 import { NewFileDto, RawData } from './templatesDto';
 import { FirebaseService } from '@/firebase/firebase.service';
@@ -9,7 +9,6 @@ import {
   Timestamp,
   collection,
   doc,
-  documentId,
   getDoc,
   getDocs,
   query,
@@ -27,10 +26,11 @@ export class TemplatesService {
     private firebaseService: FirebaseService,
   ) {}
 
-  downloadBasicExcel() {
+  downloadBasicExcel(fileType: string) {
+    const files = { blanks: 'templateSelf.xlsx', AIs: 'templateAIs.xlsx' };
     try {
-      const filepath = join(__dirname, '..', 'assets', 'templateWB.xlsx');
-      return filepath;
+      const filepath = join(__dirname, 'templateFiles', files[fileType]);
+      return { filepath: filepath, filename: files[fileType] };
     } catch (error) {
       const errorCode = error.code;
       const errorMessage = error.message;
@@ -65,35 +65,18 @@ export class TemplatesService {
     try {
       const templates = [];
 
-      // Getting list of templates assigned to this organization
       const db = this.firebaseService.getFirestore();
-      const organizationRef = doc(db, 'organizations', oraginizationId);
-      const organizationDoc = await getDoc(organizationRef);
-
-      if (!organizationDoc.data())
-        return { data: [], message: 'Organization does not exist' };
-
-      const filesArray = (organizationDoc.data().files as string[]) || [];
-      if (filesArray.length === 0)
-        return {
-          data: [],
-          message: 'No templates are assigned to this organization',
-        };
-
-      // Getting templates assigned to this organization
-      const q = query(
-        collection(db, 'templates'),
-        where(documentId(), 'in', filesArray),
-      );
-      const productsDocsSnap = await getDocs(q);
-
-      // Mutate template object and sent it back
-      productsDocsSnap.forEach((doc) => {
+      const templatesRef = collection(db, 'templates');
+      const q = query(templatesRef, where('creator', '==', oraginizationId));
+      const templatesDocs = await getDocs(q);
+      templatesDocs.forEach((doc) => {
         const templateData = doc.data();
         const templateStats = {
           id: doc.id,
+          provider: templateData.provider,
           file_name: templateData.file_name,
-          timestamp: templateData.timestamp.seconds,
+          typeFill: templateData.typeFill,
+          date_created: templateData.timestamp.seconds,
         };
         templates.push(templateStats);
       });
@@ -108,45 +91,42 @@ export class TemplatesService {
     }
   }
 
-  async addNewFile(NewFileDto: NewFileDto, file: Express.Multer.File) {
+  async addNewFile(dto: NewFileDto, file: Express.Multer.File) {
     try {
       const ufid = uuidv4();
-      const fileName = NewFileDto.fileName.replace(
+      const fileName = dto.fileName.replace(
         /\.(xlsx|xls|csv|xlsb|xlsm|xls|xlt|xltm|xla|xlam)$/i,
         '',
       );
 
       const organizationRef = doc(
         this.firebaseService.getFirestore(),
-        'organizations',
-        NewFileDto.organizationUid,
+        'users',
+        dto.organizationId,
       );
       const organizationDoc = await getDoc(organizationRef);
-      const usersRef = doc(
-        this.firebaseService.getFirestore(),
-        'users',
-        NewFileDto.userId,
-      );
-      const usersDoc = await getDoc(usersRef);
-      if (organizationDoc.exists() && usersDoc.exists()) {
-        if (
-          !usersDoc.data().organizations.includes(NewFileDto.organizationUid)
-        ) {
-          throw new HttpException(
-            'You dont have permissions',
-            HttpStatus.UNAUTHORIZED,
-          );
-        }
-        const organizationFiles = organizationDoc.data().files;
+      if (organizationDoc.exists()) {
+        // const organizationFiles = organizationDoc.data().files;
         // Make file plain
         const deciferedFile = await this.decipherFile(file);
         // Uploads file to bucket
-        await this.uploadFile(NewFileDto, ufid, file, fileName);
+        await this.uploadFile(dto, ufid, file, fileName);
         // Saves raw file for future use
-        await this.saveRawFile(deciferedFile, ufid, fileName);
+        const uploadDate = await this.saveRawFile(
+          deciferedFile,
+          ufid,
+          fileName,
+          dto.typeFill,
+          dto.organizationId,
+          'excel',
+        );
         // Adds file to organization as reference
-        await this.assignFile(organizationRef, organizationFiles, ufid);
-        return { fileId: ufid };
+        // await this.assignFile(organizationRef, organizationFiles, ufid);
+        return {
+          file_id: ufid,
+          file_name: fileName,
+          date_created: uploadDate,
+        };
       } else {
         throw new HttpException(
           'No such organization or user was found',
@@ -184,60 +164,63 @@ export class TemplatesService {
 
   private async decipherFile(file: Express.Multer.File) {
     try {
-      const data: RawData[] = [];
       const workbook = new Workbook();
       const fileBuffer = file.buffer;
-      workbook.xlsx.load(fileBuffer).then(() => {
+      const collectedData = await workbook.xlsx.load(fileBuffer).then(() => {
         const worksheet = workbook.getWorksheet('Шаблон');
-
-        worksheet.eachRow((row) => {
-          const articleWB = String(row.getCell('A').value) || null;
-          const brand = String(row.getCell('B').value) || null;
-          const rating = +row.getCell('C').value || null;
-          let response = null;
-          if (row.getCell('E').value) {
-            const cellValue = row.getCell('E').value;
-            response =
-              typeof cellValue === 'string' ? cellValue.split('^') : null;
-          }
-
-          let triggers = null;
-          if (row.getCell('G').value) {
-            const cellValue = row.getCell('G').value;
-            triggers =
-              typeof cellValue === 'string'
-                ? cellValue.replace(', ', ',').split(',')
-                : null;
-          }
-
-          const blacklistResponse = String(row.getCell('H').value) || null;
-
-          let recommendation = null;
-          if (row.getCell('J').value) {
-            const cellValue = row.getCell('J').value;
-            recommendation =
-              typeof cellValue === 'string'
-                ? cellValue.replace(', ', ',').split(',')
-                : null;
-          }
-
-          if (articleWB || brand) {
-            const rowData: RawData = {
-              articleWB,
-              brand,
-              rating,
-              response,
-              triggers,
-              blacklistResponse,
-              recommendation,
-            };
-            data.push(rowData);
-          }
-        });
-        data.shift();
+        const data: RawData[] = [];
+        let countdown = 0;
+        let row = 2;
+        const getCell = (cell: string) => {
+          const val = String(worksheet.getCell(cell).value) || null;
+          if (val === 'null') return null;
+          return val;
+        };
+        while (countdown < 10) {
+          const category = getCell(`A${row}`) || null;
+          const article = getCell(`C${row}`) || null;
+          const brand = getCell(`B${row}`) || null;
+          const rating = +getCell(`E${row}`) || null;
+          const response = getCell(`F${row}`)?.split('^') || null;
+          const triggers =
+            getCell(`H${row}`)?.replace(', ', ',').split(',') || null;
+          const blacklistResponse = getCell(`I${row}`) || null;
+          const recommendation =
+            getCell(`K${row}`)?.replace(', ', ',').split(',') || null;
+          if (
+            (category === 'null' && article === 'null' && brand === 'null') ||
+            (!article && !brand && !category)
+          )
+            countdown++;
+          const rowData: RawData = {
+            category,
+            article,
+            brand,
+            rating,
+            response,
+            triggers,
+            blacklistResponse,
+            recommendation,
+          };
+          data.push(rowData);
+          row++;
+        }
+        return data;
       });
-
-      return data;
+      const filteredData = collectedData.map((row) => {
+        if (
+          (!row.article && !row.brand && !row.category) ||
+          (row.article === 'null' &&
+            row.brand === 'null' &&
+            row.category === 'null')
+        ) {
+          return null;
+        } else {
+          return row;
+        }
+      });
+      const finalData = filteredData.filter((row) => row !== null);
+      return finalData;
     } catch (error) {
       const errorCode = error.code;
       const errorMessage = error.message;
@@ -249,18 +232,20 @@ export class TemplatesService {
   }
 
   private async uploadFile(
-    NewFileDto: NewFileDto,
+    dto: NewFileDto,
     ufid: string,
     file: Express.Multer.File,
     fileName: string,
   ) {
     try {
-      const storage = getStorage(this.firebaseService.getApp());
-      const storageRef = ref(storage, ufid);
+      const storageRef = ref(
+        this.firebaseService.getStorage(),
+        'templates/' + ufid,
+      );
       const metadata = {
         contentType: file.mimetype,
         customMetadata: {
-          uid: NewFileDto.userId,
+          uid: dto.organizationId,
           fileName: fileName,
         },
       };
@@ -279,16 +264,24 @@ export class TemplatesService {
     deciferedFile: RawData[],
     ufid: string,
     filename: string,
+    type: string,
+    creator: string,
+    provider: string,
   ) {
     try {
+      const uploadDate = Timestamp.fromDate(new Date());
       await setDoc(
         doc(this.firebaseService.getFirestore(), 'templates', ufid),
         {
           file_name: filename,
           raw_data: JSON.stringify(deciferedFile),
-          timestamp: Timestamp.fromDate(new Date()),
+          typeFill: type,
+          timestamp: uploadDate,
+          creator: creator,
+          provider: provider,
         },
       );
+      return uploadDate;
     } catch (error) {
       const errorCode = error.code;
       const errorMessage = error.message;
